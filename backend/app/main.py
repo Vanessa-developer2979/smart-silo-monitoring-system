@@ -33,8 +33,8 @@ def migrate_additive_columns():
         connection.execute(
             text(
                 "UPDATE sensor_readings SET data_source = CASE "
-                "WHEN is_simulated = 1 THEN 'simulation' ELSE 'manual' END "
-                "WHERE data_source = 'simulation' AND is_simulated = false"
+                "WHEN is_simulated IS TRUE THEN 'simulation' ELSE 'manual' END "
+                "WHERE data_source = 'simulation' AND is_simulated IS FALSE"
             )
         )
 
