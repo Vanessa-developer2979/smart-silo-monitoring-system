@@ -5,6 +5,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+database_url = os.getenv("DATABASE_URL", "sqlite:///./smart_silo.db")
+if database_url.startswith(("postgres://", "postgresql://")):
+    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
 
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
@@ -12,7 +17,7 @@ class Settings:
         "DEMO_MODE_ENABLED",
         "false" if os.getenv("APP_ENV", "development").lower() == "production" else "true",
     ).strip().lower() in {"1", "true", "yes", "on"}
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./smart_silo.db")
+    database_url: str = database_url
     jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "")
     jwt_access_token_minutes: int = int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "30"))
     initial_admin_email: str = os.getenv("INITIAL_ADMIN_EMAIL", "").strip().lower()

@@ -46,6 +46,16 @@ npm run dev -- --host localhost
 
 Vite serves the frontend at `http://localhost:5173`. `VITE_API_URL` defaults to `http://127.0.0.1:8000/api`.
 
+## Deployment
+
+The frontend is a Vite single-page app for Vercel; the FastAPI backend and PostgreSQL database are configured as a Render Blueprint in `render.yaml`.
+
+1. In Render, choose **New → Blueprint**, connect this GitHub repository, and deploy `render.yaml`. The blueprint prompts for `CORS_ORIGINS`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD`. For the first deployment, set `CORS_ORIGINS` to `http://localhost:5173`; after Vercel provides a URL, update it to that origin (for example, `https://your-project.vercel.app`). Use a private, unique admin password.
+2. In Vercel, import this GitHub repository and set **Root Directory** to `frontend`. Use the default Vite build command (`npm run build`) and output directory (`dist`). Set the `VITE_API_URL` environment variable to `https://<your-render-service>.onrender.com/api`, then deploy.
+3. Update Render's `CORS_ORIGINS` to the exact Vercel production origin and redeploy/restart the API. If you use Vercel preview deployments, add their origins too.
+
+The Render Blueprint uses free plans to make a no-cost demo possible. Render's free web service can sleep while idle, and its free PostgreSQL database expires after 30 days; do not use this configuration for production or durable data. Upgrade the Render database and API to plans that meet your availability and storage needs before relying on them.
+
 ## Authentication and roles
 
 - Login uses backend-verified credentials and returns a short-lived JWT. The browser keeps it in `sessionStorage` for the current tab session.
