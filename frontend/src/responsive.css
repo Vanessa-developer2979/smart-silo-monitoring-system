@@ -169,3 +169,343 @@
     width: min(45vw, 180px);
   }
 }
+
+.nav-link {
+  font-size: 14px;
+}
+
+.nav-section {
+  font-size: 11px;
+}
+
+.brand strong {
+  font-size: 17px;
+}
+
+.brand small,
+.region-card small,
+.region-card span,
+.sidebar-footer small {
+  font-size: 11px;
+}
+
+.welcome-row h1,
+.content-title-row h1 {
+  font-size: clamp(25px, 2vw, 29px);
+}
+
+.welcome-row p,
+.content-title-row p,
+.panel-heading p,
+.mode-description p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.button,
+.search-box input,
+.report-control,
+.report-control select,
+.mode-picker,
+.mode-picker select,
+.silo-form label,
+.user-form label {
+  font-size: 14px;
+}
+
+.mode-description > span {
+  font-size: 12px;
+}
+
+.mode-detail,
+.sidebar-footer strong,
+.region-card strong {
+  font-size: 13px;
+}
+
+.silo-form input,
+.silo-form select,
+.user-form input,
+.user-form select {
+  font-size: 14px;
+}
+
+.data-notice,
+.inline-notice,
+.toast-notice {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.data-notice > span {
+  font-size: 11px;
+}
+
+.metric-top {
+  font-size: 13px;
+}
+
+.metric-value {
+  font-size: 28px;
+}
+
+.metric-bottom,
+.chart-legend,
+.chart-footer,
+.table-scroll th,
+.table-scroll td,
+.inspection-list p,
+.page-footnote,
+.report-pagination {
+  font-size: 12px;
+}
+
+.panel-heading h2 {
+  font-size: 17px;
+}
+
+.status-badge,
+.source-badge,
+.acknowledged-tag {
+  font-size: 11px;
+}
+
+.alert-description strong,
+.alert-title strong {
+  font-size: 13px;
+}
+
+.alert-description p,
+.full-alert p {
+  font-size: 12px;
+}
+
+.alert-description small,
+.full-alert small,
+.inspection-list strong {
+  font-size: 11px;
+}
+
+.temperature-reading {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.temperature-reading.normal {
+  color: #287447;
+}
+
+.temperature-reading.warning {
+  color: #a96816;
+}
+
+.temperature-reading.critical {
+  color: #bd352d;
+}
+
+.toast-notice {
+  position: fixed;
+  z-index: 20;
+  top: 76px;
+  right: 24px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border: 1px solid #b9ddc0;
+  border-radius: 9px;
+  background: #f0f8f1;
+  color: #225d34;
+  box-shadow: 0 8px 28px #173a251f;
+}
+
+.hardware-setup-panel > p {
+  max-width: 780px;
+  color: #657168;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.notification-area {
+  position: relative;
+}
+
+.notification-button {
+  width: 40px;
+  height: 40px;
+}
+
+.notification-count {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  background: #c83d34;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.notification-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 12px);
+  right: -48px;
+  width: min(390px, calc(100vw - 28px));
+  overflow: hidden;
+  border: 1px solid #e4e9e4;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 36px #19352324;
+}
+
+.notification-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 17px 12px;
+  border-bottom: 1px solid #edf0ed;
+}
+
+.notification-heading h2 {
+  margin: 0;
+  color: #293d30;
+  font-size: 17px;
+}
+
+.notification-heading p {
+  margin: 4px 0 0;
+  color: #758078;
+  font-size: 12px;
+}
+
+.notification-list {
+  max-height: min(55vh, 420px);
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f2f0;
+}
+
+.notification-item:hover {
+  background: #f7f9f7;
+}
+
+.notification-item > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.notification-item strong {
+  color: #35453a;
+  font-size: 13px;
+}
+
+.notification-item > span > span {
+  color: #657168;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.notification-item small {
+  color: #849087;
+  font-size: 11px;
+}
+
+.notification-empty {
+  margin: 0;
+  padding: 19px 17px;
+  color: #657168;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.notification-all-link {
+  display: block;
+  padding: 12px 16px;
+  border-top: 1px solid #edf0ed;
+  color: #287447;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #14251bcc;
+}
+
+.confirmation-dialog {
+  width: min(440px, 100%);
+  padding: 24px;
+  border: 1px solid #e4e9e4;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 20px 60px #10221840;
+}
+
+.confirmation-dialog h2 {
+  margin: 0;
+  color: #263d2e;
+  font-size: 21px;
+}
+
+.confirmation-dialog p {
+  margin: 10px 0 22px;
+  color: #657168;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.icon-button:focus-visible,
+.button:focus-visible,
+.nav-link:focus-visible,
+.notification-item:focus-visible {
+  outline: 3px solid #327a4d77;
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .notification-popover {
+    right: -44px;
+  }
+
+  .toast-notice {
+    top: 70px;
+    right: 12px;
+  }
+
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog-actions .button {
+    width: 100%;
+  }
+
+  .metric-value {
+    font-size: 23px;
+  }
+}

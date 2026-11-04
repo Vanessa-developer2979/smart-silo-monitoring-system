@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Activity, ArrowRight, CircleAlert, Clock3, Droplets, Download, Plus, Thermometer, Warehouse } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
+import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { useDashboardData } from '../hooks/useDashboardData.js'
 import { useAuth } from '../hooks/useAuth.js'
@@ -119,7 +120,7 @@ export function DashboardPage({ operatorMode = false }) {
             return <tr key={silo.id}>
               <td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td>
               <td>{silo.grain_type}</td>
-              <td>{Number.isFinite(silo.temperature) ? `${silo.temperature}°C` : '—'}</td>
+              <td><TemperatureReading value={silo.temperature} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /></td>
               <td>{Number.isFinite(silo.humidity) ? `${silo.humidity}%` : '—'}</td>
               <td><div className="moisture-cell"><span>{Number.isFinite(moisture) ? `${moisture}%` : '—'}</span>{Number.isFinite(moisture) && <span className={`source-badge ${silo.data_source || 'simulation'}`}>{sourceLabel(silo.data_source)}</span>}</div></td>
               <td><div className={`capacity-cell${fill > 90 ? ' capacity-high' : ''}`}><div className="capacity-track"><i style={{ width: `${fill}%` }} /></div><small>{fill}%</small></div></td>
