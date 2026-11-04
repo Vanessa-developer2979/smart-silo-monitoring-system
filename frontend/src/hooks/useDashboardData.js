@@ -8,6 +8,7 @@ export function useDashboardData() {
   const [silos, setSilos] = useState([])
   const [alerts, setAlerts] = useState([])
   const [history, setHistory] = useState([])
+  const [recentActivity, setRecentActivity] = useState([])
   const [apiState, setApiState] = useState('connecting')
   const [actionError, setActionError] = useState('')
   const [loadedSource, setLoadedSource] = useState(null)
@@ -24,6 +25,25 @@ export function useDashboardData() {
         data_source: silo.latest_reading?.data_source,
       })))
       setAlerts(data.alerts)
+      const siloNames = new Map(data.silos.map((silo) => [silo.id, silo.name]))
+      setRecentActivity([
+        ...data.manualReadings
+          .filter((reading) => reading.grain_moisture_percent != null)
+          .map((reading) => ({
+            id: `reading-${reading.id}`,
+            type: 'reading',
+            siloName: siloNames.get(reading.silo_id) || `Silo ${reading.silo_id}`,
+            description: `Manual moisture entry · ${reading.grain_moisture_percent}%`,
+            occurredAt: reading.recorded_at,
+          })),
+        ...data.inspections.map((inspection) => ({
+          id: `inspection-${inspection.id}`,
+          type: 'inspection',
+          siloName: siloNames.get(inspection.silo_id) || `Silo ${inspection.silo_id}`,
+          description: `${inspection.activity_type[0].toUpperCase()}${inspection.activity_type.slice(1)} saved for ${siloNames.get(inspection.silo_id) || `Silo ${inspection.silo_id}`}`,
+          occurredAt: inspection.performed_at,
+        })),
+      ].sort((first, second) => new Date(second.occurredAt) - new Date(first.occurredAt)).slice(0, 4))
       setHistory(data.history.map((reading) => ({
         time: new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
         temperature: reading.temperature_c,
@@ -39,6 +59,7 @@ export function useDashboardData() {
         setSilos([])
         setAlerts([])
         setHistory([])
+        setRecentActivity([])
       }
     })
     return () => { active = false }
@@ -69,6 +90,7 @@ export function useDashboardData() {
     silos: sourceReady ? silos : [],
     alerts: sourceReady ? alerts : [],
     history: sourceReady ? history : [],
+    recentActivity: sourceReady ? recentActivity : [],
     apiState,
     isLoading: !sourceReady,
     actionError,

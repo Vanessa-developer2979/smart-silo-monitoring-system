@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Activity, ArrowRight, CircleAlert, Clock3, Droplets, Download, Plus, Thermometer, Warehouse } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Activity, ArrowRight, CircleAlert, ClipboardList, Clock3, Droplets, Download, Plus, Thermometer, Warehouse } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
@@ -18,7 +18,7 @@ const sourceLabel = (source) => ({
 }[source] || 'Unknown')
 
 export function DashboardPage({ operatorMode = false }) {
-  const { silos, alerts, history, apiState, isLoading, actionError, acknowledge, resolve, dataSource } = useDashboardData()
+  const { silos, alerts, history, recentActivity, apiState, isLoading, actionError, acknowledge, resolve, dataSource } = useDashboardData()
   const { user } = useAuth()
   const visibleSilos = silos
   const siloIds = new Set(visibleSilos.map((silo) => silo.id))
@@ -44,9 +44,14 @@ export function DashboardPage({ operatorMode = false }) {
         : dataSource === 'hardware'
           ? 'No sensor readings have been received. Connect and configure a supported device to view live data.'
           : 'No manual readings are available. Add a reading from the Monitoring page.'
-  const [currentDate] = useState(() => new Intl.DateTimeFormat('en-MW', {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const currentDate = new Intl.DateTimeFormat('en-MW', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Africa/Blantyre',
-  }).format(new Date()))
+  }).format(now)
 
   return (
     <>
@@ -94,23 +99,36 @@ export function DashboardPage({ operatorMode = false }) {
           <div className="chart-footer"><span><Clock3 size={14} /> {apiState === 'connected' ? 'Latest available readings' : 'Waiting for monitoring service'}</span><span>{simulatedChart ? 'Dashed lines represent generated sample values' : 'Values are filtered by the selected data source'}</span></div>
         </section>
 
-        <section className="panel alert-panel">
-          <div className="panel-heading"><div><h2>Recent alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Active problems · resolved alerts are hidden</p></div><a className="text-link" href="/alerts">View all <ArrowRight size={14} /></a></div>
-          <div className="alert-list">{activeAlerts.slice(0, 4).map((alert) => (
-            <div className="alert-item" key={alert.id}>
-              <span className={`alert-symbol ${alert.severity}`}>{alert.severity === 'critical' ? '!' : alert.severity === 'warning' ? '↑' : 'i'}</span>
-              <div className="alert-description">
-                <div><strong>{alert.silo_name || 'Storage alert'}</strong><StatusBadge status={alert.severity} /></div>
-                <p>{alert.message}</p><small>{new Date(alert.created_at).toLocaleString('en-MW', { timeZone: 'Africa/Blantyre' })}</small>
-                <div className="alert-actions">
-                  {!alert.acknowledged && <button className="mini-action" onClick={() => acknowledge(alert.id)}>Acknowledge</button>}
-                  {!alert.resolved && <button className="mini-action resolve-action" onClick={() => resolve(alert.id)}>Resolve</button>}
-                  {alert.resolved && <span className="resolved-label">Resolved</span>}
+        <div className="dashboard-side-stack">
+          <section className="panel alert-panel">
+            <div className="panel-heading"><div><h2>Recent alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Active problems · resolved alerts are hidden</p></div><a className="text-link" href="/alerts">View all <ArrowRight size={14} /></a></div>
+            <div className="alert-list">{activeAlerts.slice(0, 4).map((alert) => (
+              <div className="alert-item" key={alert.id}>
+                <span className={`alert-symbol ${alert.severity}`}>{alert.severity === 'critical' ? '!' : alert.severity === 'warning' ? '↑' : 'i'}</span>
+                <div className="alert-description">
+                  <div><strong>{alert.silo_name || 'Storage alert'}</strong><StatusBadge status={alert.severity} /></div>
+                  <p>{alert.message}</p><small>{new Date(alert.created_at).toLocaleString('en-MW', { timeZone: 'Africa/Blantyre' })}</small>
+                  <div className="alert-actions">
+                    {!alert.acknowledged && <button className="mini-action" onClick={() => acknowledge(alert.id)}>Acknowledge</button>}
+                    {!alert.resolved && <button className="mini-action resolve-action" onClick={() => resolve(alert.id)}>Resolve</button>}
+                    {alert.resolved && <span className="resolved-label">Resolved</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}</div>
-        </section>
+            ))}</div>
+            {!activeAlerts.length && <p className="activity-empty">No active alerts.</p>}
+          </section>
+          <section className="panel activity-panel">
+            <div className="panel-heading"><div><h2>Recent Activity</h2><p>Latest manual readings and inspection records</p></div></div>
+            {isLoading ? <p className="activity-empty" role="status">Loading recent activity…</p> : apiState === 'offline' ? <p className="activity-empty" role="alert">Recent activity could not be loaded. Check the service connection.</p> : recentActivity.length ? <div className="activity-list">{recentActivity.map((item) => {
+              const Icon = item.type === 'reading' ? Droplets : ClipboardList
+              return <article className="activity-item" key={item.id}>
+                <span className={`activity-icon ${item.type}`}><Icon size={16} aria-hidden="true" /></span>
+                <div className="activity-description"><strong>{item.siloName}</strong><p>{item.description}</p><time dateTime={item.occurredAt}>{formatRelativeTime(item.occurredAt, now)}</time></div>
+              </article>
+            })}</div> : <p className="activity-empty">No recent activity.</p>}
+          </section>
+        </div>
       </div>
 
       <section className="panel silo-panel">
@@ -134,6 +152,15 @@ export function DashboardPage({ operatorMode = false }) {
       </section>
     </>
   )
+}
+
+function formatRelativeTime(value, now) {
+  const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - new Date(value).getTime()) / 1000))
+  if (elapsedSeconds < 60) return 'Just now'
+  if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)} min ago`
+  if (elapsedSeconds < 86400) return `${Math.floor(elapsedSeconds / 3600)} hr ago`
+  if (elapsedSeconds < 604800) return `${Math.floor(elapsedSeconds / 86400)} days ago`
+  return new Intl.DateTimeFormat('en-MW', { month: 'short', day: 'numeric', timeZone: 'Africa/Blantyre' }).format(new Date(value))
 }
 
 function MetricCard({ label, value, note, icon: Icon, style, alertValue = false }) {

@@ -23,12 +23,20 @@ api.interceptors.response.use(
 )
 
 export async function fetchDashboard(dataSource = 'simulation') {
-  const [silos, alerts, history] = await Promise.all([
+  const [silos, alerts, history, manualReadings, inspections] = await Promise.all([
     api.get('/silos/', { params: { data_source: dataSource } }),
     api.get('/alerts/'),
     api.get('/readings/', { params: { data_source: dataSource, limit: 1000 } }),
+    api.get('/readings/', { params: { data_source: 'manual', limit: 1000 } }),
+    api.get('/inspections/'),
   ])
-  return { silos: silos.data, alerts: alerts.data, history: history.data }
+  return {
+    silos: silos.data,
+    alerts: alerts.data,
+    history: history.data,
+    manualReadings: manualReadings.data,
+    inspections: inspections.data,
+  }
 }
 
 export const siloService = {

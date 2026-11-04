@@ -511,6 +511,76 @@
   background: #dcebdd;
 }
 
+.dashboard-side-stack {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  min-width: 0;
+}
+
+.activity-list {
+  margin-top: 9px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid #f0f2f0;
+}
+
+.activity-item:last-child {
+  border-bottom: 0;
+}
+
+.activity-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.activity-icon.reading {
+  background: #edf4fa;
+  color: #5989b0;
+}
+
+.activity-icon.inspection {
+  background: #edf6ef;
+  color: #438055;
+}
+
+.activity-description {
+  min-width: 0;
+  flex: 1;
+}
+
+.activity-description strong {
+  color: #455349;
+  font-size: 13px;
+}
+
+.activity-description p {
+  margin: 4px 0;
+  color: #68756c;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.activity-description time {
+  color: #89948c;
+  font-size: 11px;
+}
+
+.activity-empty {
+  margin: 12px 0 4px;
+  color: #89948c;
+  font-size: 13px;
+}
+
 .report-silo-charts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
@@ -553,6 +623,10 @@
 
   .report-silo-charts {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-side-stack {
+    grid-row: auto;
   }
 
   .report-silo-chart {
