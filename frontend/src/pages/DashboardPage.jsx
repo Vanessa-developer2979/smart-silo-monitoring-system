@@ -49,17 +49,15 @@ export function DashboardPage({ operatorMode = false }) {
       <div className="welcome-row">
         <div>
           <div className="eyebrow">{currentDate.toUpperCase()} <span className="live-tag"><i /> {dataSource === 'hardware' ? 'HARDWARE MODE' : dataSource === 'manual' ? 'MANUAL MODE' : 'SIMULATION'}</span></div>
-          <h1>{operatorMode ? 'Your silo overview' : `Welcome, ${user?.full_name?.split(' ')[0] || 'Administrator'}`} <span>☀️</span></h1>
-          <p>{operatorMode ? 'A quick look at the silos assigned to you.' : 'Here’s what’s happening across your grain storage today.'}</p>
+          <h1>{operatorMode ? 'Silo monitoring' : `Storage operations${user?.full_name ? ` · ${user.full_name.split(' ')[0]}` : ''}`}</h1>
+          <p>{operatorMode ? 'Monitoring overview for your assigned silos.' : 'An overview of storage conditions and active alerts.'}</p>
         </div>
         <div className="welcome-actions">
           {!operatorMode && <button className="button button-secondary"><Download size={16} /> Export report</button>}
           {!operatorMode && <a className="button button-primary" href="/silos"><Plus size={17} /> Add silo</a>}
         </div>
       </div>
-      <SimulatedDataNotice>
-        {isLoading ? `Loading ${sourceLabel(dataSource).toLowerCase()} readings…` : apiState === 'offline' ? 'The monitoring service is unavailable. No readings are currently displayed.' : `${history.length.toLocaleString()} latest ${sourceLabel(dataSource).toLowerCase()} readings loaded.`}
-      </SimulatedDataNotice>
+      <SimulatedDataNotice />
       {actionError && <div className="inline-notice" role="alert">{actionError}</div>}
 
       <section className="metric-grid">

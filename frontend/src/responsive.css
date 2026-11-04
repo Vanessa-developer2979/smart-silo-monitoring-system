@@ -487,6 +487,60 @@
   outline-offset: 2px;
 }
 
+.brand-icon-image {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+}
+
+.profile-initials {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #dcebdd;
+  border-radius: 50%;
+  background: #e8f3e9;
+  color: #286b41;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+}
+
+.profile-initials:hover {
+  background: #dcebdd;
+}
+
+.report-silo-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.report-silo-chart {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e8ede8;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.report-silo-chart h3 {
+  margin: 0;
+  color: #35453a;
+  font-size: 16px;
+}
+
+.report-silo-chart .report-legend {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.report-silo-chart .report-chart {
+  height: 250px;
+}
+
 @media (max-width: 520px) {
   .notification-popover {
     right: -44px;
@@ -495,6 +549,18 @@
   .toast-notice {
     top: 70px;
     right: 12px;
+  }
+
+  .report-silo-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-silo-chart {
+    padding: 11px 8px;
+  }
+
+  .report-silo-chart .report-chart {
+    height: 220px;
   }
 
   .dialog-actions {

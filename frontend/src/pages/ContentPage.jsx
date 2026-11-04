@@ -19,6 +19,48 @@ const pageCopy = {
 }
 const sourceNames = { simulation: 'Simulated', hardware: 'Hardware', manual: 'Manual' }
 
+function buildReportCharts(readings, silos) {
+  const charts = new Map()
+  for (const reading of readings) {
+    let chart = charts.get(reading.silo_id)
+    if (!chart) {
+      chart = {
+        id: reading.silo_id,
+        name: reading.silo_name || silos.find((silo) => silo.id === reading.silo_id)?.name || `Silo ${reading.silo_id}`,
+        hours: new Map(),
+      }
+      charts.set(reading.silo_id, chart)
+    }
+
+    const hour = new Date(reading.recorded_at)
+    hour.setMinutes(0, 0, 0)
+    const timestamp = hour.getTime()
+    let group = chart.hours.get(timestamp)
+    if (!group) {
+      group = { timestamp, count: 0, temperature: 0, humidity: 0, moistureTotal: 0, moistureCount: 0 }
+      chart.hours.set(timestamp, group)
+    }
+    group.count += 1
+    group.temperature += reading.temperature_c
+    group.humidity += reading.humidity_percent
+    if (reading.grain_moisture_percent != null) {
+      group.moistureTotal += reading.grain_moisture_percent
+      group.moistureCount += 1
+    }
+  }
+
+  return Array.from(charts.values()).map((chart) => ({
+    id: chart.id,
+    name: chart.name,
+    readings: Array.from(chart.hours.values()).sort((a, b) => a.timestamp - b.timestamp).map((group) => ({
+      time: new Date(group.timestamp).toLocaleString('en-MW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
+      temperature: Number((group.temperature / group.count).toFixed(2)),
+      humidity: Number((group.humidity / group.count).toFixed(2)),
+      moisture: group.moistureCount ? Number((group.moistureTotal / group.moistureCount).toFixed(2)) : null,
+    })),
+  }))
+}
+
 export function ContentPage({ page }) {
   const { dataSource } = useDataMode()
   const { user } = useAuth()
@@ -222,27 +264,7 @@ export function ContentPage({ page }) {
   const reportPageSize = 10
   const reportPageCount = Math.max(1, Math.ceil(reportReadings.length / reportPageSize))
   const visibleReportReadings = reportReadings.slice((reportPage - 1) * reportPageSize, reportPage * reportPageSize)
-  const reportChartData = Object.values(reportReadings.reduce((groups, reading) => {
-    const recordedAt = new Date(reading.recorded_at)
-    const hour = new Date(recordedAt)
-    hour.setMinutes(0, 0, 0)
-    const key = hour.toISOString()
-    const group = groups[key] || { timestamp: hour, count: 0, temperature: 0, humidity: 0, moistureTotal: 0, moistureCount: 0 }
-    group.count += 1
-    group.temperature += reading.temperature_c
-    group.humidity += reading.humidity_percent
-    if (reading.grain_moisture_percent != null) {
-      group.moistureTotal += reading.grain_moisture_percent
-      group.moistureCount += 1
-    }
-    groups[key] = group
-    return groups
-  }, {})).sort((a, b) => a.timestamp - b.timestamp).map((group) => ({
-    time: group.timestamp.toLocaleString('en-MW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
-    temperature: Number((group.temperature / group.count).toFixed(2)),
-    humidity: Number((group.humidity / group.count).toFixed(2)),
-    moisture: group.moistureCount ? Number((group.moistureTotal / group.moistureCount).toFixed(2)) : null,
-  }))
+  const reportCharts = buildReportCharts(reportReadings, reportSilos)
 
   const exportReportCsv = () => {
     const headers = ['Date', 'Time', 'Silo', 'Temperature (°C)', 'Air Humidity (%)', 'Grain Moisture (%)', 'Data Source', 'Status']
@@ -303,7 +325,7 @@ export function ContentPage({ page }) {
           </>}
         </div>
       </div>
-      <SimulatedDataNotice>{loadError ? 'The monitoring service could not load this page. Review the message below.' : loadedDataSource !== dataSource ? 'Loading data from the monitoring service…' : dataSource === 'simulation' ? `${pageSilos.length} assigned demonstration silos are available. No physical sensors are connected.` : dataSource === 'hardware' ? 'Hardware mode is selected, but no sensor integration is connected. Live readings will appear after a supported device is configured.' : 'Manual mode displays values entered by authorized users. These records are labeled as manually entered.'}</SimulatedDataNotice>
+      <SimulatedDataNotice />
       {successToast && <div className="toast-notice" role="status">{successToast}</div>}
       {message && <div className="inline-notice" role="status">{message}</div>}
 
@@ -312,7 +334,7 @@ export function ContentPage({ page }) {
 
       {page === 'silos' && (
         <section className="panel silo-panel content-panel">
-          <div className="panel-heading"><div><h2>Registered silos</h2><p>{pageSilos.length} storage locations{apiReady && loadedDataSource === dataSource ? ' · synced with local API' : ''}</p></div><label className="search-box"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search silos" /></label></div>
+          <div className="panel-heading"><div><h2>Registered silos</h2></div><label className="search-box"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search silos" /></label></div>
           {showForm && isAdministrator && <form className="silo-form" onSubmit={submitSilo}>
             <label>Silo name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. Lilongwe Silo 03" /></label>
             <label>Location<input required value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="District or region" /></label>
@@ -376,27 +398,34 @@ export function ContentPage({ page }) {
           <>
             <section className="panel content-panel report-chart-panel">
               <div className="panel-heading">
-                <div><h2>Historical Storage Conditions</h2><p>{report.reading_count} readings · hourly averages{reportSiloId ? ` · ${reportSilos.find((silo) => String(silo.id) === reportSiloId)?.name || 'selected silo'}` : ' across accessible silos'}</p></div>
+                <div><h2>Historical Storage Conditions</h2><p>{report.reading_count} readings across {report.silo_count} silos · charts shown separately for each silo</p></div>
                 <span className="status-badge info">{dataSource === 'simulation' ? 'Simulation Mode Active' : `${dataSource} mode selected`}</span>
               </div>
-              <div className="report-legend">
-                <span><i className="report-legend-temp" /> Temperature (°C)</span>
-                <span><i className="report-legend-humidity" /> Air humidity (%)</span>
-                <span><i className="report-legend-moisture" /> Grain moisture (%)</span>
-              </div>
-              <div className="large-chart report-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={reportChartData} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
-                    <CartesianGrid stroke="#edf1ed" vertical={false} />
-                    <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={30} />
-                    <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} label={{ value: '°C', angle: -90, position: 'insideLeft' }} />
-                    <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} label={{ value: '%', angle: 90, position: 'insideRight' }} />
-                    <Tooltip />
-                    <Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature (°C)" stroke="#28814d" strokeWidth={2.2} dot={false} isAnimationActive={false} />
-                    <Line yAxisId="percent" type="monotone" dataKey="humidity" name="Air humidity (%)" stroke="#76a4ce" strokeWidth={2} dot={false} isAnimationActive={false} />
-                    <Line yAxisId="percent" type="monotone" dataKey="moisture" name="Grain moisture (%)" stroke="#c58b3b" strokeWidth={2} dot={false} isAnimationActive={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="report-silo-charts">
+                {reportCharts.map((chart) => (
+                  <section className="report-silo-chart" key={chart.id} aria-label={`${chart.name} historical conditions`}>
+                    <h3>{chart.name}</h3>
+                    <div className="report-legend">
+                      <span><i className="report-legend-temp" /> Temperature (°C)</span>
+                      <span><i className="report-legend-humidity" /> Air humidity (%)</span>
+                      <span><i className="report-legend-moisture" /> Grain moisture (%)</span>
+                    </div>
+                    <div className="large-chart report-chart">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chart.readings} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
+                          <CartesianGrid stroke="#edf1ed" vertical={false} />
+                          <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={30} />
+                          <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} label={{ value: '°C', angle: -90, position: 'insideLeft' }} />
+                          <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} label={{ value: '%', angle: 90, position: 'insideRight' }} />
+                          <Tooltip />
+                          <Line yAxisId="temperature" type="monotone" dataKey="temperature" name={`${chart.name} temperature (°C)`} stroke="#28814d" strokeWidth={2.2} dot={false} isAnimationActive={false} />
+                          <Line yAxisId="percent" type="monotone" dataKey="humidity" name={`${chart.name} air humidity (%)`} stroke="#76a4ce" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          <Line yAxisId="percent" type="monotone" dataKey="moisture" name={`${chart.name} grain moisture (%)`} stroke="#c58b3b" strokeWidth={2} dot={false} isAnimationActive={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+                ))}
               </div>
             </section>
             <section className="panel content-panel report-table-panel">

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Leaf, UserPlus } from 'lucide-react'
+import { ArrowRight, UserPlus } from 'lucide-react'
 import api from '../../services/api.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import '../../auth.css'
@@ -51,9 +51,13 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <div className="login-brand">
-        <span className="brand-icon"><Leaf size={22} /></span>
+        <img className="login-logo" src="/smart-silo-mark.svg" alt="" />
         <span><strong>Smart Silo Monitoring System</strong><small>Safe Grain, Food Security</small></span>
       </div>
+      <section className="login-showcase" aria-label="Smart grain storage monitoring">
+        <div className="login-showcase-copy"><span>SMART GRAIN STORAGE</span><h2>Protect every harvest.</h2><p>Clear storage insights for safer grain and stronger food security.</p></div>
+        <img className="login-illustration" src="/maize-silo-illustration.svg" alt="Illustration of maize cobs growing beside a grain silo" />
+      </section>
       <section className="login-card">
         <span className="eyebrow">MALAWI GRAIN MONITORING</span>
         <h1>{createAccount ? 'Create Account' : 'Welcome'}</h1>

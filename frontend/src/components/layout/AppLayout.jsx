@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { Activity, Bell, Boxes, ChartNoAxesCombined, CircleUserRound, LayoutDashboard, Leaf, MapPin, Menu, Settings, Sprout, Users, X } from 'lucide-react'
+import { Activity, Bell, Boxes, ChartNoAxesCombined, LayoutDashboard, Menu, Settings, Sprout, Users, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth.js'
 import { alertService } from '../../services/api.js'
 
@@ -26,6 +26,13 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const userId = user?.id
   const activeNotifications = notifications.filter((item) => !item.acknowledged && !item.resolved)
+  const userInitials = (user?.full_name || 'User')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
 
   useEffect(() => {
     if (!userId) return undefined
@@ -77,8 +84,7 @@ export function AppLayout() {
     <div className="app-shell">
       {open && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setOpen(false)} />}
       <aside className={`sidebar${open ? ' sidebar-open' : ''}`}>
-        <div className="brand"><div className="brand-icon"><Leaf size={21} /></div><div><strong>Smart Silo Monitoring System</strong><small>MALAWI GRAIN MONITORING</small></div><button className="icon-button sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu"><X size={19} /></button></div>
-        <div className="region-card"><span className="region-icon"><MapPin size={17} /></span><div><small>ACTIVE REGION</small><strong>Lilongwe District</strong><span>Central Region, Malawi</span></div></div>
+        <div className="brand"><img className="brand-icon-image" src="/smart-silo-mark.svg" alt="" /><div><strong>Smart Silo Monitoring System</strong><small>MALAWI GRAIN MONITORING</small></div><button className="icon-button sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu"><X size={19} /></button></div>
         <div className="nav-section">MONITORING</div>
         <nav aria-label="Monitoring navigation">{links(navigation)}</nav>
         {user?.role === 'administrator' && <><div className="nav-section admin-section">ADMINISTRATION</div><nav aria-label="Administration navigation">{links(adminNavigation)}</nav></>}
@@ -94,7 +100,7 @@ export function AppLayout() {
               <Link className="notification-all-link" to="/alerts" onClick={() => setNotificationsOpen(false)}>View all alerts</Link>
             </section>}
           </div>
-          <button type="button" className="icon-button profile-button" aria-label="Account options" title={`Account options for ${user?.full_name || 'your account'}`} onClick={() => setLogoutPromptOpen(true)}><CircleUserRound size={21} /></button>
+          <button type="button" className="profile-button profile-initials" aria-label={`Account options for ${user?.full_name || 'your account'}`} title={`Account options for ${user?.full_name || 'your account'}`} onClick={() => setLogoutPromptOpen(true)}>{userInitials}</button>
         </div></header>
         <div className="page-content"><Outlet /></div>
       </main>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout.jsx'
 import { AuthProvider } from './context/AuthProvider.jsx'
@@ -32,25 +33,39 @@ function LoginRoute() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(() => sessionStorage.getItem('smart-silo-splash-shown') !== 'true')
+
+  useEffect(() => {
+    if (!showSplash) return undefined
+    const timer = window.setTimeout(() => {
+      sessionStorage.setItem('smart-silo-splash-shown', 'true')
+      setShowSplash(false)
+    }, 1100)
+    return () => window.clearTimeout(timer)
+  }, [showSplash])
+
   return (
     <BrowserRouter>
       <AuthProvider>
         <DataModeProvider>
-          <Routes>
-            <Route path="/login" element={<LoginRoute />} />
-            <Route element={<RequireAuth />}>
-              <Route index element={<RoleDashboard />} />
-              <Route path="silos" element={<ContentPage page="silos" />} />
-              <Route path="monitoring" element={<ContentPage page="monitoring" />} />
-              <Route path="alerts" element={<ContentPage page="alerts" />} />
-              <Route path="reports" element={<ContentPage page="reports" />} />
-              <Route element={<RequireAdmin />}>
-                <Route path="users" element={<ContentPage page="users" />} />
-                <Route path="settings" element={<ContentPage page="settings" />} />
+          <>
+            <Routes>
+              <Route path="/login" element={<LoginRoute />} />
+              <Route element={<RequireAuth />}>
+                <Route index element={<RoleDashboard />} />
+                <Route path="silos" element={<ContentPage page="silos" />} />
+                <Route path="monitoring" element={<ContentPage page="monitoring" />} />
+                <Route path="alerts" element={<ContentPage page="alerts" />} />
+                <Route path="reports" element={<ContentPage page="reports" />} />
+                <Route element={<RequireAdmin />}>
+                  <Route path="users" element={<ContentPage page="users" />} />
+                  <Route path="settings" element={<ContentPage page="settings" />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
+            </Routes>
+            {showSplash && <div className="startup-splash" role="status" aria-label="Loading Smart Silo Monitoring System"><img src="/smart-silo-mark.svg" alt="" /><strong>Smart Silo</strong><span>Grain storage monitoring</span><i /></div>}
+          </>
         </DataModeProvider>
       </AuthProvider>
     </BrowserRouter>
