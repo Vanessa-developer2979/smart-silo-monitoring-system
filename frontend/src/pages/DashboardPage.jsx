@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Activity, ArrowRight, CircleAlert, ClipboardList, Clock3, Droplets, Download, Plus, Thermometer, Warehouse } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
+import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { useDashboardData } from '../hooks/useDashboardData.js'
 import { useAuth } from '../hooks/useAuth.js'
@@ -35,6 +36,7 @@ export function DashboardPage({ operatorMode = false }) {
   const averageHumidity = numberAverage(visibleSilos.map((silo) => silo.humidity).filter(Number.isFinite))
   const averageMoisture = numberAverage(visibleSilos.map((silo) => silo.grain_moisture_percent).filter(Number.isFinite))
   const simulatedChart = dataSource === 'simulation'
+  const sourceWatermark = { manual: 'MANUAL DATA', hardware: 'LIVE HARDWARE DATA', simulation: 'SIMULATED DATA' }[dataSource]
   const emptyReadingsMessage = isLoading
     ? 'Loading readings from the monitoring service…'
     : apiState === 'offline'
@@ -71,9 +73,9 @@ export function DashboardPage({ operatorMode = false }) {
 
       <section className="metric-grid">
         <MetricCard label="Active silos" value={visibleSilos.length.toString().padStart(2, '0')} note="Across assigned locations" icon={Warehouse} style="green" />
-        <MetricCard label="Avg. temperature" value={averageTemperature == null ? '—' : `${averageTemperature.toFixed(1)}°C`} note="Air temperature" icon={Thermometer} style="blue" />
-        <MetricCard label="Avg. air humidity" value={averageHumidity == null ? '—' : `${Math.round(averageHumidity)}%`} note="Relative humidity" icon={Droplets} style="purple" />
-        <MetricCard label="Avg. grain moisture" value={averageMoisture == null ? '—' : `${averageMoisture.toFixed(1)}%`} note="Grain moisture content" icon={Activity} style="green" />
+        <MetricCard label="Avg. temperature" value={averageTemperature == null ? '—' : `${averageTemperature.toFixed(1)}°C`} note="Air temperature" icon={Thermometer} style="blue" dataSource={dataSource} />
+        <MetricCard label="Avg. air humidity" value={averageHumidity == null ? '—' : `${Math.round(averageHumidity)}%`} note="Relative humidity" icon={Droplets} style="purple" dataSource={dataSource} />
+        <MetricCard label="Avg. grain moisture" value={averageMoisture == null ? '—' : `${averageMoisture.toFixed(1)}%`} note="Grain moisture content" icon={Activity} style="green" dataSource={dataSource} />
         <MetricCard label="Active alerts" value={activeAlertSummary} note={`${activeThresholdCount} unresolved alerts`} icon={CircleAlert} style="orange" alertValue />
       </section>
 
@@ -82,18 +84,30 @@ export function DashboardPage({ operatorMode = false }) {
           <div className="panel-heading"><div><h2>Storage conditions</h2><p>Air temperature and relative humidity · selected data source</p></div><select aria-label="Chart time range"><option>Latest readings</option></select></div>
           <div className="chart-legend"><span><i className="legend-temp" /> Air temperature (°C)</span><span><i className="legend-hum" /> Relative humidity (%)</span></div>
           <div className="chart-wrap chart-watermark-wrap">
-            {simulatedChart && <span className="chart-watermark">SIMULATED DATA</span>}
+            <span className="chart-watermark">{sourceWatermark}</span>
             {!history.length && <span className="chart-empty" role="status">{emptyReadingsMessage}</span>}
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="#edf1ed" vertical={false} />
-                <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} minTickGap={30} />
-                <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
-                <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
-                <Tooltip />
-                <Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature °C" stroke="#28814d" strokeWidth={2.2} strokeDasharray={simulatedChart ? '5 4' : undefined} dot={false} connectNulls={false} isAnimationActive={false} />
-                <Line yAxisId="humidity" type="monotone" dataKey="humidity" name="Humidity %" stroke="#76a4ce" strokeWidth={2} strokeDasharray={simulatedChart ? '5 4' : undefined} dot={false} connectNulls={false} isAnimationActive={false} />
-              </LineChart>
+              {dataSource === 'manual' ? (
+                <ScatterChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke="#edf1ed" vertical={false} />
+                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} minTickGap={30} />
+                  <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
+                  <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
+                  <Tooltip />
+                  <Scatter yAxisId="temperature" dataKey="temperature" name="Temperature °C" fill="#28814d" />
+                  <Scatter yAxisId="humidity" dataKey="humidity" name="Humidity %" fill="#76a4ce" />
+                </ScatterChart>
+              ) : (
+                <LineChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke="#edf1ed" vertical={false} />
+                  <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} minTickGap={30} />
+                  <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
+                  <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
+                  <Tooltip />
+                  <Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature °C" stroke="#28814d" strokeWidth={2.2} strokeDasharray={simulatedChart ? '5 4' : undefined} dot={false} connectNulls={false} isAnimationActive={false} />
+                  <Line yAxisId="humidity" type="monotone" dataKey="humidity" name="Humidity %" stroke="#76a4ce" strokeWidth={2} strokeDasharray={simulatedChart ? '5 4' : undefined} dot={false} connectNulls={false} isAnimationActive={false} />
+                </LineChart>
+              )}
             </ResponsiveContainer>
           </div>
           <div className="chart-footer"><span><Clock3 size={14} /> {apiState === 'connected' ? 'Latest available readings' : 'Waiting for monitoring service'}</span><span>{simulatedChart ? 'Dashed lines represent generated sample values' : 'Values are filtered by the selected data source'}</span></div>
@@ -163,10 +177,11 @@ function formatRelativeTime(value, now) {
   return new Intl.DateTimeFormat('en-MW', { month: 'short', day: 'numeric', timeZone: 'Africa/Blantyre' }).format(new Date(value))
 }
 
-function MetricCard({ label, value, note, icon: Icon, style, alertValue = false }) {
+function MetricCard({ label, value, note, icon: Icon, style, alertValue = false, dataSource }) {
   return <article className={`metric-card${alertValue ? ' alert-metric' : ''}`}>
     <div className="metric-top"><span>{label}</span><span className={`metric-icon ${style}`}><Icon size={18} /></span></div>
     <div className={`metric-value${alertValue ? ' alert-split' : ''}`}>{value}</div>
+    {dataSource && <DataSourceBadge source={dataSource} />}
     <div className="metric-bottom"><span>{note}</span></div>
   </article>
 }

@@ -26,6 +26,7 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const userId = user?.id
   const activeNotifications = notifications.filter((item) => !item.acknowledged && !item.resolved)
+  const activeAlertCount = notifications.filter((item) => !item.resolved).length
   const userInitials = (user?.full_name || 'User')
     .trim()
     .split(/\s+/)
@@ -58,10 +59,12 @@ export function AppLayout() {
       if (document.visibilityState === 'visible') refresh()
     }
     document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('alerts:updated', refresh)
     return () => {
       active = false
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('alerts:updated', refresh)
     }
   }, [userId])
 
@@ -86,7 +89,7 @@ export function AppLayout() {
       <aside className={`sidebar${open ? ' sidebar-open' : ''}`}>
         <div className="brand"><img className="brand-icon-image" src="/smart-silo-mark.svg" alt="" /><div><strong>Smart Silo Monitoring System</strong><small>MALAWI GRAIN MONITORING</small></div><button className="icon-button sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu"><X size={19} /></button></div>
         <div className="nav-section">MONITORING</div>
-        <nav aria-label="Monitoring navigation">{links(navigation)}</nav>
+        <nav aria-label="Monitoring navigation">{links(navigation.map((item) => item.path === '/alerts' ? { ...item, count: activeAlertCount } : item))}</nav>
         {user?.role === 'administrator' && <><div className="nav-section admin-section">ADMINISTRATION</div><nav aria-label="Administration navigation">{links(adminNavigation)}</nav></>}
         <div className="sidebar-footer"><span><Sprout size={17} /></span><div><strong>Grain storage operations</strong><small>Malawi monitoring workspace</small></div></div>
       </aside>

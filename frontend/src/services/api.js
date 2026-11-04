@@ -50,6 +50,10 @@ export const alertService = {
   resolve: (id) => api.patch(`/alerts/${id}/resolve`).then(({ data }) => data),
 }
 
+export function notifyAlertsUpdated() {
+  window.dispatchEvent(new Event('alerts:updated'))
+}
+
 export const readingService = {
   create: (payload) => api.post('/readings/', payload).then(({ data }) => data),
   list: (dataSource) => api.get('/readings/', { params: { data_source: dataSource, limit: 1000 } }).then(({ data }) => data),

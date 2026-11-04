@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { alertService, fetchDashboard } from '../services/api.js'
+import { alertService, fetchDashboard, notifyAlertsUpdated } from '../services/api.js'
 import { useDataMode } from './useDataMode.js'
 import { demoAlerts, demoSilos } from '../utils/demoData.js'
 
@@ -70,6 +70,7 @@ export function useDashboardData() {
     try {
       const updated = await alertService.acknowledge(alertId)
       setAlerts((items) => items.map((item) => item.id === alertId ? { ...item, ...updated } : item))
+      notifyAlertsUpdated()
     } catch (error) {
       setActionError(error.response?.data?.detail || 'Could not acknowledge alert. Check the API connection.')
     }
@@ -80,6 +81,7 @@ export function useDashboardData() {
     try {
       const updated = await alertService.resolve(alertId)
       setAlerts((items) => items.map((item) => item.id === alertId ? { ...item, ...updated } : item))
+      notifyAlertsUpdated()
     } catch (error) {
       setActionError(error.response?.data?.detail || 'Could not resolve alert. Check the API connection.')
     }
