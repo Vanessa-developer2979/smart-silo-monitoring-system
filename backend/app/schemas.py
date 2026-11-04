@@ -120,6 +120,7 @@ class InspectionRead(ORMModel):
     activity_type: str
     notes: str
     performed_at: datetime
+    logged_by: str | None = None
 
 
 class AssignmentCreate(BaseModel):

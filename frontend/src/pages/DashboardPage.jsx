@@ -7,6 +7,7 @@ import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { useDashboardData } from '../hooks/useDashboardData.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { chartTickInterval } from '../utils/chartReadings.js'
 
 const numberAverage = (items) => items.length
   ? items.reduce((total, value) => total + value, 0) / items.length
@@ -36,6 +37,7 @@ export function DashboardPage({ operatorMode = false }) {
   const averageHumidity = numberAverage(visibleSilos.map((silo) => silo.humidity).filter(Number.isFinite))
   const averageMoisture = numberAverage(visibleSilos.map((silo) => silo.grain_moisture_percent).filter(Number.isFinite))
   const simulatedChart = dataSource === 'simulation'
+  const chartInterval = chartTickInterval(history.length)
   const sourceWatermark = { manual: 'MANUAL DATA', hardware: 'LIVE HARDWARE DATA', simulation: 'SIMULATED DATA' }[dataSource]
   const emptyReadingsMessage = isLoading
     ? 'Loading readings from the monitoring service…'
@@ -47,10 +49,22 @@ export function DashboardPage({ operatorMode = false }) {
           ? 'No sensor readings have been received. Connect and configure a supported device to view live data.'
           : 'No manual readings are available. Add a reading from the Monitoring page.'
   const [now, setNow] = useState(() => new Date())
+  const [actionToast, setActionToast] = useState('')
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000)
     return () => window.clearInterval(timer)
   }, [])
+  useEffect(() => {
+    if (!actionToast) return undefined
+    const timer = window.setTimeout(() => setActionToast(''), 3500)
+    return () => window.clearTimeout(timer)
+  }, [actionToast])
+  const acknowledgeAlert = async (alertId) => {
+    if (await acknowledge(alertId)) setActionToast('Alert acknowledged. Please inspect the silo.')
+  }
+  const resolveAlert = async (alertId) => {
+    if (await resolve(alertId)) setActionToast('Alert resolved successfully.')
+  }
   const currentDate = new Intl.DateTimeFormat('en-MW', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Africa/Blantyre',
   }).format(now)
@@ -69,6 +83,7 @@ export function DashboardPage({ operatorMode = false }) {
         </div>
       </div>
       <SimulatedDataNotice />
+      {actionToast && <div className="toast-notice" role="status">{actionToast}</div>}
       {actionError && <div className="inline-notice" role="alert">{actionError}</div>}
 
       <section className="metric-grid">
@@ -81,7 +96,7 @@ export function DashboardPage({ operatorMode = false }) {
 
       <div className="dashboard-grid">
         <section className="panel trend-panel">
-          <div className="panel-heading"><div><h2>Storage conditions</h2><p>Air temperature and relative humidity · selected data source</p></div><select aria-label="Chart time range"><option>Latest readings</option></select></div>
+          <div className="panel-heading"><div><h2>Storage conditions</h2><p>Air temperature and relative humidity · selected data source</p>{simulatedChart && <p className="chart-mode-note">Data is simulated for demonstration. Averages are shown hourly.</p>}</div><select aria-label="Chart time range"><option>{simulatedChart ? 'Hourly Averages' : 'Latest readings'}</option></select></div>
           <div className="chart-legend"><span><i className="legend-temp" /> Air temperature (°C)</span><span><i className="legend-hum" /> Relative humidity (%)</span></div>
           <div className="chart-wrap chart-watermark-wrap">
             <span className="chart-watermark">{sourceWatermark}</span>
@@ -90,7 +105,7 @@ export function DashboardPage({ operatorMode = false }) {
               {dataSource === 'manual' ? (
                 <ScatterChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} minTickGap={30} />
+                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} interval={chartInterval} minTickGap={30} />
                   <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
                   <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
                   <Tooltip />
@@ -100,7 +115,7 @@ export function DashboardPage({ operatorMode = false }) {
               ) : (
                 <LineChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} minTickGap={30} />
+                  <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} interval={chartInterval} minTickGap={30} />
                   <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
                   <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
                   <Tooltip />
@@ -123,8 +138,8 @@ export function DashboardPage({ operatorMode = false }) {
                   <div><strong>{alert.silo_name || 'Storage alert'}</strong><StatusBadge status={alert.severity} /></div>
                   <p>{alert.message}</p><small>{new Date(alert.created_at).toLocaleString('en-MW', { timeZone: 'Africa/Blantyre' })}</small>
                   <div className="alert-actions">
-                    {!alert.acknowledged && <button className="mini-action" onClick={() => acknowledge(alert.id)}>Acknowledge</button>}
-                    {!alert.resolved && <button className="mini-action resolve-action" onClick={() => resolve(alert.id)}>Resolve</button>}
+                    {!alert.acknowledged && !alert.resolved && <button className="mini-action" onClick={() => acknowledgeAlert(alert.id)}>Acknowledge</button>}
+                    {alert.acknowledged && !alert.resolved && <button className="mini-action resolve-action" onClick={() => resolveAlert(alert.id)}>Resolve</button>}
                     {alert.resolved && <span className="resolved-label">Resolved</span>}
                   </div>
                 </div>
@@ -133,7 +148,7 @@ export function DashboardPage({ operatorMode = false }) {
             {!activeAlerts.length && <p className="activity-empty">No active alerts.</p>}
           </section>
           <section className="panel activity-panel">
-            <div className="panel-heading"><div><h2>Recent Activity</h2><p>Latest manual readings and inspection records</p></div></div>
+            <div className="panel-heading"><div><h2>Recent Activity</h2><p>{dataSource === 'simulation' ? 'Generated simulation readings' : dataSource === 'hardware' ? 'Latest sensor readings' : 'Manual readings and inspection records'}</p></div></div>
             {isLoading ? <p className="activity-empty" role="status">Loading recent activity…</p> : apiState === 'offline' ? <p className="activity-empty" role="alert">Recent activity could not be loaded. Check the service connection.</p> : recentActivity.length ? <div className="activity-list">{recentActivity.map((item) => {
               const Icon = item.type === 'reading' ? Droplets : ClipboardList
               return <article className="activity-item" key={item.id}>

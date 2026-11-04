@@ -99,3 +99,8 @@ class Inspection(Base):
     notes: Mapped[str] = mapped_column(Text)
     performed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
     silo: Mapped[Silo] = relationship(back_populates="inspections")
+    user: Mapped["User | None"] = relationship()
+
+    @property
+    def logged_by(self) -> str | None:
+        return self.user.full_name if self.user else None

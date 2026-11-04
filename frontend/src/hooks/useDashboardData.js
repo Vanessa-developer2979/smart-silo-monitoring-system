@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { alertService, fetchDashboard, notifyAlertsUpdated } from '../services/api.js'
 import { useDataMode } from './useDataMode.js'
 import { demoAlerts, demoSilos } from '../utils/demoData.js'
+import { formatReadingHistory } from '../utils/chartReadings.js'
 
 export function useDashboardData() {
   const { dataSource } = useDataMode()
@@ -26,30 +27,33 @@ export function useDashboardData() {
       })))
       setAlerts(data.alerts)
       const siloNames = new Map(data.silos.map((silo) => [silo.id, silo.name]))
-      setRecentActivity([
-        ...data.manualReadings
-          .filter((reading) => reading.grain_moisture_percent != null)
-          .map((reading) => ({
-            id: `reading-${reading.id}`,
-            type: 'reading',
-            siloName: siloNames.get(reading.silo_id) || `Silo ${reading.silo_id}`,
-            description: `Manual moisture entry · ${reading.grain_moisture_percent}%`,
-            occurredAt: reading.recorded_at,
-          })),
-        ...data.inspections.map((inspection) => ({
+      const recentReadings = dataSource === 'manual'
+        ? data.manualReadings
+        : data.history
+      const readingActivity = recentReadings.map((reading) => ({
+        id: `${dataSource}-reading-${reading.id}`,
+        type: 'reading',
+        siloName: siloNames.get(reading.silo_id) || `Silo ${reading.silo_id}`,
+        description: dataSource === 'simulation'
+          ? 'Simulated reading generated'
+          : dataSource === 'hardware'
+            ? 'Sensor reading received'
+            : `Manual moisture entry · ${reading.grain_moisture_percent ?? '—'}%`,
+        occurredAt: reading.recorded_at,
+      }))
+      const inspectionActivity = dataSource === 'manual'
+        ? data.inspections.map((inspection) => ({
           id: `inspection-${inspection.id}`,
           type: 'inspection',
           siloName: siloNames.get(inspection.silo_id) || `Silo ${inspection.silo_id}`,
-          description: `${inspection.activity_type[0].toUpperCase()}${inspection.activity_type.slice(1)} saved for ${siloNames.get(inspection.silo_id) || `Silo ${inspection.silo_id}`}`,
+          description: `${inspection.activity_type[0].toUpperCase()}${inspection.activity_type.slice(1)} saved`,
           occurredAt: inspection.performed_at,
-        })),
-      ].sort((first, second) => new Date(second.occurredAt) - new Date(first.occurredAt)).slice(0, 4))
-      setHistory(data.history.map((reading) => ({
-        time: new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
-        temperature: reading.temperature_c,
-        humidity: reading.humidity_percent,
-        data_source: reading.data_source,
-      })).reverse())
+        }))
+        : []
+      setRecentActivity([...readingActivity, ...inspectionActivity]
+        .sort((first, second) => new Date(second.occurredAt) - new Date(first.occurredAt))
+        .slice(0, 4))
+      setHistory(formatReadingHistory(data.history, dataSource === 'simulation'))
       setApiState('connected')
       setLoadedSource(dataSource)
     }).catch(() => {
@@ -71,8 +75,10 @@ export function useDashboardData() {
       const updated = await alertService.acknowledge(alertId)
       setAlerts((items) => items.map((item) => item.id === alertId ? { ...item, ...updated } : item))
       notifyAlertsUpdated()
+      return true
     } catch (error) {
       setActionError(error.response?.data?.detail || 'Could not acknowledge alert. Check the API connection.')
+      return false
     }
   }
 
@@ -82,8 +88,10 @@ export function useDashboardData() {
       const updated = await alertService.resolve(alertId)
       setAlerts((items) => items.map((item) => item.id === alertId ? { ...item, ...updated } : item))
       notifyAlertsUpdated()
+      return true
     } catch (error) {
       setActionError(error.response?.data?.detail || 'Could not resolve alert. Check the API connection.')
+      return false
     }
   }
 

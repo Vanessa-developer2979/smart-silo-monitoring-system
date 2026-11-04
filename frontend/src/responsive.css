@@ -259,6 +259,70 @@
   min-width: 112px;
 }
 
+.chart-mode-note {
+  margin-top: 6px !important;
+  color: #78857b !important;
+  font-size: 12px !important;
+  font-style: italic;
+}
+
+.inspection-table-wrap {
+  margin-top: 18px;
+}
+
+.inspection-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.inspection-table th,
+.inspection-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #edf0ed;
+  color: #58655b;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.inspection-table th {
+  background: #f7f9f7;
+  color: #69756c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
+}
+
+.inspection-table td:first-child {
+  white-space: nowrap;
+}
+
+.inspection-table .inspection-notes-cell {
+  min-width: 180px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.inspection-delete-button {
+  color: #a64c43;
+}
+
+.inspection-delete-button:hover {
+  background: #fff0ef;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .reading-form {
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
 }

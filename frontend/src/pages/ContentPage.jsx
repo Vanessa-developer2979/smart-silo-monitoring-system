@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Search, Settings, Shield, UserPlus, Warehouse } from 'lucide-react'
+import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Search, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
@@ -8,6 +8,7 @@ import { TemperatureReading } from '../components/dashboard/TemperatureReading.j
 import { alertService, inspectionService, notifyAlertsUpdated, readingService, reportService, siloService, userService } from '../services/api.js'
 import { useDataMode } from '../hooks/useDataMode.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { chartTickInterval, formatReadingHistory } from '../utils/chartReadings.js'
 import './reports.css'
 
 const pageCopy = {
@@ -142,11 +143,7 @@ export function ContentPage({ page }) {
       monitoring: () => Promise.all([
         siloService.list(dataSource).then(setSilos),
         inspectionService.list().then(setInspections),
-        readingService.list(dataSource).then((items) => setHistory(items.map((reading) => ({
-          time: new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
-          temperature: reading.temperature_c,
-          humidity: reading.humidity_percent,
-        })).reverse())),
+        readingService.list(dataSource).then((items) => setHistory(formatReadingHistory(items, dataSource === 'simulation'))),
       ]),
     }[page]
     if (!request) return undefined
@@ -165,6 +162,7 @@ export function ContentPage({ page }) {
         setSilos([])
         setAlerts([])
         setHistory([])
+        setInspections([])
         if (page === 'reports') setReportError(detail)
         else setMessage(detail)
       }
@@ -191,6 +189,7 @@ export function ContentPage({ page }) {
       const updated = await alertService.acknowledge(alertId)
       setAlerts((items) => items.map((item) => item.id === alertId ? { ...item, ...updated } : item))
       notifyAlertsUpdated()
+      setSuccessToast('Alert acknowledged. Please inspect the silo.')
     } catch (error) {
       setMessage(error.response?.data?.detail || 'Could not acknowledge alert. Check the API connection.')
     }
@@ -201,6 +200,7 @@ export function ContentPage({ page }) {
       const updated = await alertService.resolve(alertId)
       setAlerts((items) => items.map((item) => item.id === alertId ? { ...item, ...updated } : item))
       notifyAlertsUpdated()
+      setSuccessToast('Alert resolved successfully.')
     } catch (error) {
       setMessage(error.response?.data?.detail || 'Could not resolve alert. Check the API connection.')
     }
@@ -239,6 +239,17 @@ export function ContentPage({ page }) {
       setSuccessToast('Inspection record saved successfully.')
     } catch (error) {
       setMessage(error.response?.data?.detail || 'Could not save the inspection record.')
+    }
+  }
+
+  const deleteInspection = async (inspection) => {
+    if (!window.confirm('Delete this inspection record? This cannot be undone.')) return
+    try {
+      await inspectionService.delete(inspection.id)
+      setInspections((items) => items.filter((item) => item.id !== inspection.id))
+      setSuccessToast('Inspection record deleted.')
+    } catch (error) {
+      setMessage(error.response?.data?.detail || 'Could not delete the inspection record.')
     }
   }
 
@@ -282,6 +293,7 @@ export function ContentPage({ page }) {
     ? silos
     : []
   const pageHistory = loadedDataSource === dataSource ? history : []
+  const pageChartInterval = chartTickInterval(pageHistory.length)
   const filteredSilos = pageSilos.filter((silo) => `${silo.name} ${silo.location} ${silo.grain_type}`.toLowerCase().includes(search.toLowerCase()))
   const averageOf = (field, digits = 1) => {
     const values = pageSilos.map((silo) => silo.latest_reading?.[field]).filter(Number.isFinite)
@@ -379,7 +391,7 @@ export function ContentPage({ page }) {
       {page === 'monitoring' && <>
         <div className="metric-grid compact-metrics">{[['Temperature', averageOf('temperature_c'), 'Air temperature'], ['Air humidity', averageOf('humidity_percent'), 'Relative humidity'], ['Grain moisture', averageOf('grain_moisture_percent'), 'Moisture content']].map(([label, value, note]) => <article className="metric-card" key={label}><div className="metric-top">{label}<span className="metric-icon green"><Activity size={18} /></span></div><div className="metric-value">{value}</div><DataSourceBadge source={dataSource} /><div className="metric-bottom">{note}</div></article>)}</div>
         <section className="panel trend-panel content-panel">
-          <div className="panel-heading"><div><h2>Temperature & humidity history</h2><p>{dataSource === 'simulation' ? 'Generated sample readings' : `${sourceNames[dataSource]} readings`}</p></div><span className="chart-axis-caption">Left: °C · Right: %</span></div>
+          <div className="panel-heading"><div><h2>Temperature & humidity history</h2><p>{dataSource === 'simulation' ? 'Generated sample readings' : `${sourceNames[dataSource]} readings`}</p>{dataSource === 'simulation' && <p className="chart-mode-note">Data is simulated for demonstration. Averages are shown hourly.</p>}</div><span className="chart-axis-caption">Left: °C · Right: %</span></div>
           <div className="large-chart chart-watermark-wrap">
             <span className="chart-watermark">{sourceWatermarks[dataSource]}</span>
             {!pageHistory.length && <span className="chart-empty" role="status">{loadedDataSource !== dataSource ? 'Loading readings from the monitoring service…' : loadError ? 'Readings could not be loaded. Check the service connection and try again.' : dataSource === 'hardware' ? 'No sensor readings have been received. Configure a supported device to view live data.' : dataSource === 'simulation' ? 'No simulated readings are available for the selected silos.' : 'No manual readings are available. Add a reading to view it here.'}</span>}
@@ -387,7 +399,7 @@ export function ContentPage({ page }) {
               {dataSource === 'manual' ? (
                 <ScatterChart data={pageHistory}>
                   <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} />
+                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} interval={pageChartInterval} minTickGap={30} />
                   <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} />
                   <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} />
                   <Tooltip />
@@ -397,7 +409,7 @@ export function ContentPage({ page }) {
               ) : (
                 <LineChart data={pageHistory}>
                   <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" tickLine={false} axisLine={false} />
+                  <XAxis dataKey="time" tickLine={false} axisLine={false} interval={pageChartInterval} minTickGap={30} />
                   <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} />
                   <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} />
                   <Tooltip />
@@ -408,7 +420,33 @@ export function ContentPage({ page }) {
             </ResponsiveContainer>
           </div>
         </section>
-        <section className="panel content-panel"><div className="panel-heading"><div><h2>Inspection & maintenance log</h2><p>Record operator work and keep a history by silo.</p></div></div><form className="silo-form inspection-form" onSubmit={submitInspection}><label>Silo<select required value={inspectionForm.silo_id} onChange={(event) => setInspectionForm({ ...inspectionForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Activity<select value={inspectionForm.activity_type} onChange={(event) => setInspectionForm({ ...inspectionForm, activity_type: event.target.value })}><option value="inspection">Inspection</option><option value="maintenance">Maintenance</option><option value="cleaning">Cleaning</option><option value="other">Other</option></select></label><label>Notes<input required value={inspectionForm.notes} onChange={(event) => setInspectionForm({ ...inspectionForm, notes: event.target.value })} placeholder="Work performed or observations" /></label><button className="button button-primary">Save record</button></form>{inspections.length > 0 && <div className="inspection-list">{inspections.map((item) => <p key={item.id}><strong>{pageSilos.find((silo) => silo.id === item.silo_id)?.name || `Silo ${item.silo_id}`}</strong> · {item.activity_type} — {item.notes}</p>)}</div>}</section>
+        <section className="panel content-panel">
+          <div className="panel-heading"><div><h2>Inspection & maintenance log</h2><p>Record operator work and keep a history by silo.</p></div></div>
+          <form className="silo-form inspection-form" onSubmit={submitInspection}>
+            <label>Silo<select required value={inspectionForm.silo_id} onChange={(event) => setInspectionForm({ ...inspectionForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label>
+            <label>Activity<select value={inspectionForm.activity_type} onChange={(event) => setInspectionForm({ ...inspectionForm, activity_type: event.target.value })}><option value="inspection">Inspection</option><option value="maintenance">Maintenance</option><option value="cleaning">Cleaning</option><option value="other">Other</option></select></label>
+            <label>Notes<input required value={inspectionForm.notes} onChange={(event) => setInspectionForm({ ...inspectionForm, notes: event.target.value })} placeholder="Work performed or observations" /></label>
+            <button className="button button-primary">Save record</button>
+          </form>
+          <div className="table-scroll inspection-table-wrap">
+            <table className="inspection-table">
+              <thead><tr><th>Date & Time</th><th>Silo</th><th>Activity</th><th>Notes</th><th>Logged By</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+              <tbody>
+                {inspections.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatAlertDate(item.performed_at)}</td>
+                    <td>{pageSilos.find((silo) => silo.id === item.silo_id)?.name || `Silo ${item.silo_id}`}</td>
+                    <td>{item.activity_type}</td>
+                    <td className="inspection-notes-cell">{item.notes}</td>
+                    <td>{item.logged_by || (item.user_id === user?.id ? user.full_name : '—')}</td>
+                    <td>{(isAdministrator || item.user_id === user?.id) && <button type="button" className="icon-button inspection-delete-button" aria-label={`Delete ${item.activity_type} record for ${pageSilos.find((silo) => silo.id === item.silo_id)?.name || `Silo ${item.silo_id}`}`} title="Delete record" onClick={() => deleteInspection(item)}><Trash2 size={16} /></button>}</td>
+                  </tr>
+                ))}
+                {!inspections.length && <tr><td className="empty-table" colSpan="6">No inspection records have been saved.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </>}
 
       {page === 'alerts' && (

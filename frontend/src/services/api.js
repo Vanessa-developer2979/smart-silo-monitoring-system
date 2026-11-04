@@ -62,6 +62,7 @@ export const readingService = {
 export const inspectionService = {
   list: () => api.get('/inspections/').then(({ data }) => data),
   create: (payload) => api.post('/inspections/', payload).then(({ data }) => data),
+  delete: (id) => api.delete(`/inspections/${id}`),
 }
 
 export const reportService = {

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/inspections", tags=["inspections and maintenance"], 
 
 @router.get("/", response_model=list[InspectionRead])
 def list_inspections(silo_id: int | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    query = select(Inspection).join(Silo).order_by(Inspection.performed_at.desc())
+    query = select(Inspection).options(joinedload(Inspection.user)).join(Silo).order_by(Inspection.performed_at.desc())
     if silo_id is not None:
         query = query.where(Inspection.silo_id == silo_id)
     if current_user.role != "administrator":
@@ -37,3 +37,22 @@ def create_inspection(payload: InspectionCreate, db: Session = Depends(get_db), 
     db.commit()
     db.refresh(inspection)
     return inspection
+
+
+@router.delete("/{inspection_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_inspection(
+    inspection_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    inspection = db.get(Inspection, inspection_id)
+    if inspection is None:
+        raise HTTPException(status_code=404, detail="Inspection record not found.")
+    if current_user.role != "administrator":
+        if inspection.silo not in current_user.assigned_silos:
+            raise HTTPException(status_code=403, detail="This record is outside your assigned silos.")
+        if inspection.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only delete inspection records you logged.")
+    db.delete(inspection)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
