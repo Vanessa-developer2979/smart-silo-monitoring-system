@@ -3,9 +3,9 @@ import { useDataMode } from '../../hooks/useDataMode.js'
 export function SimulatedDataNotice({ children }) {
   const { dataSource, selectDataSource } = useDataMode()
   const messages = {
-    simulation: 'Simulation Mode Active: No physical IoT hardware is connected. Displaying generated data for demonstration purposes.',
-    hardware: 'Live Hardware Mode selected. No ESP32/DHT22 device is connected; hardware readings will appear only after integration.',
-    manual: 'Manual Entry Mode selected. Manually entered readings are labeled by source; no physical IoT hardware is connected.',
+    simulation: 'Generated sample readings are shown for demonstration. No physical sensor hardware is connected.',
+    hardware: 'Hardware mode is selected, but no sensor integration is connected. Live readings will appear after a supported device is configured.',
+    manual: 'Manual mode displays values entered by authorized users. These records are labeled as manually entered.',
   }
   const labels = { simulation: 'SIMULATION MODE', hardware: 'LIVE HARDWARE MODE', manual: 'MANUAL ENTRY MODE' }
   return (

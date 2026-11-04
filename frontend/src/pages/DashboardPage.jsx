@@ -30,6 +30,15 @@ export function DashboardPage({ operatorMode = false }) {
   const averageHumidity = numberAverage(visibleSilos.map((silo) => silo.humidity).filter(Number.isFinite))
   const averageMoisture = numberAverage(visibleSilos.map((silo) => silo.grain_moisture_percent).filter(Number.isFinite))
   const simulatedChart = dataSource === 'simulation'
+  const emptyReadingsMessage = isLoading
+    ? 'Loading readings from the monitoring service…'
+    : apiState === 'offline'
+      ? 'Readings could not be loaded. Check the service connection and try again.'
+      : dataSource === 'simulation'
+        ? 'No simulated readings are available for the selected silos.'
+        : dataSource === 'hardware'
+          ? 'No sensor readings have been received. Connect and configure a supported device to view live data.'
+          : 'No manual readings are available. Add a reading from the Monitoring page.'
   const [currentDate] = useState(() => new Intl.DateTimeFormat('en-MW', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'Africa/Blantyre',
   }).format(new Date()))
@@ -48,7 +57,7 @@ export function DashboardPage({ operatorMode = false }) {
         </div>
       </div>
       <SimulatedDataNotice>
-        {isLoading ? 'Loading the selected data source…' : apiState === 'offline' ? 'API is unavailable. Showing local demonstration data.' : apiState === 'connected' ? 'Selected mode readings are requested from the API.' : 'Connecting to the local API…'}
+        {isLoading ? `Loading ${sourceLabel(dataSource).toLowerCase()} readings…` : apiState === 'offline' ? 'The monitoring service is unavailable. No readings are currently displayed.' : `${history.length.toLocaleString()} latest ${sourceLabel(dataSource).toLowerCase()} readings loaded.`}
       </SimulatedDataNotice>
       {actionError && <div className="inline-notice" role="alert">{actionError}</div>}
 
@@ -66,7 +75,7 @@ export function DashboardPage({ operatorMode = false }) {
           <div className="chart-legend"><span><i className="legend-temp" /> Air temperature (°C)</span><span><i className="legend-hum" /> Relative humidity (%)</span></div>
           <div className="chart-wrap chart-watermark-wrap">
             {simulatedChart && <span className="chart-watermark">SIMULATED DATA</span>}
-            {!history.length && <span className="chart-empty">{dataSource === 'hardware' ? 'No hardware readings received. Connect and configure an ESP32/DHT22 integration.' : 'No manual readings entered yet.'}</span>}
+            {!history.length && <span className="chart-empty" role="status">{emptyReadingsMessage}</span>}
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
                 <CartesianGrid stroke="#edf1ed" vertical={false} />
@@ -79,7 +88,7 @@ export function DashboardPage({ operatorMode = false }) {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="chart-footer"><span><Clock3 size={14} /> {apiState === 'connected' ? 'Latest available readings' : 'Local demonstration samples'}</span><span>{simulatedChart ? 'Dashed lines indicate simulated values' : 'Hardware/manual readings shown by selected source'}</span></div>
+          <div className="chart-footer"><span><Clock3 size={14} /> {apiState === 'connected' ? 'Latest available readings' : 'Waiting for monitoring service'}</span><span>{simulatedChart ? 'Dashed lines represent generated sample values' : 'Values are filtered by the selected data source'}</span></div>
         </section>
 
         <section className="panel alert-panel">

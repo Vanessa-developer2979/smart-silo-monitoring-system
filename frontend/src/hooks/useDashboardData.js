@@ -5,8 +5,8 @@ import { demoAlerts, demoSilos } from '../utils/demoData.js'
 
 export function useDashboardData() {
   const { dataSource } = useDataMode()
-  const [silos, setSilos] = useState(demoSilos)
-  const [alerts, setAlerts] = useState(demoAlerts)
+  const [silos, setSilos] = useState([])
+  const [alerts, setAlerts] = useState([])
   const [history, setHistory] = useState([])
   const [apiState, setApiState] = useState('connecting')
   const [actionError, setActionError] = useState('')
@@ -36,11 +36,9 @@ export function useDashboardData() {
       if (active) {
         setApiState('offline')
         setLoadedSource(dataSource)
-        if (dataSource !== 'simulation') {
-          setSilos([])
-          setAlerts([])
-          setHistory([])
-        }
+        setSilos([])
+        setAlerts([])
+        setHistory([])
       }
     })
     return () => { active = false }

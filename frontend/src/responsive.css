@@ -1,0 +1,171 @@
+@media (max-width: 800px) {
+  .sidebar {
+    width: 270px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .main-area,
+  .page-content {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .metric-grid,
+  .compact-metrics,
+  .report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-scroll table {
+    min-width: 700px;
+  }
+
+  .metric-card,
+  .panel,
+  .chart-wrap,
+  .large-chart {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .page-content {
+    padding: 18px 14px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .welcome-row,
+  .content-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .welcome-row h1,
+  .content-title-row h1 {
+    font-size: clamp(20px, 6vw, 24px);
+    overflow-wrap: anywhere;
+  }
+
+  .welcome-actions,
+  .content-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .welcome-actions > .button,
+  .content-actions:not(.report-controls) > .button {
+    flex: 1 1 auto;
+  }
+
+  .metric-grid,
+  .compact-metrics,
+  .report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .metric-card {
+    padding: 11px;
+    overflow-wrap: anywhere;
+  }
+
+  .metric-value {
+    font-size: 21px;
+  }
+
+  .alert-split {
+    font-size: 12px !important;
+    line-height: 1.35;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .panel {
+    padding: 13px 11px 10px;
+  }
+
+  .panel-heading {
+    flex-wrap: wrap;
+  }
+
+  .chart-wrap {
+    height: 205px;
+  }
+
+  .large-chart {
+    height: 250px;
+  }
+
+  .chart-legend {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    line-height: 1.4;
+  }
+
+  .chart-empty {
+    inset: 25% 5% auto;
+    padding: 10px;
+  }
+
+  .chart-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+    line-height: 1.4;
+  }
+
+  .mode-notice {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mode-description {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .mode-picker {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mode-picker select {
+    width: min(65%, 240px);
+    min-width: 0;
+  }
+
+  .mode-detail {
+    grid-column: auto;
+  }
+
+  .reading-form,
+  .user-form,
+  .silo-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-chart {
+    height: 240px;
+  }
+
+  .report-controls {
+    align-items: stretch;
+  }
+
+  .report-controls > .button {
+    flex-basis: 100%;
+  }
+
+  .search-box input {
+    width: min(45vw, 180px);
+  }
+}

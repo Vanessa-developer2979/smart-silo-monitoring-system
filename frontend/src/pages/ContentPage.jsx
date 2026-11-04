@@ -6,7 +6,6 @@ import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { alertService, inspectionService, readingService, reportService, siloService, userService } from '../services/api.js'
 import { useDataMode } from '../hooks/useDataMode.js'
 import { useAuth } from '../hooks/useAuth.js'
-import { demoAlerts, demoSilos } from '../utils/demoData.js'
 import './reports.css'
 
 const pageCopy = {
@@ -23,8 +22,8 @@ export function ContentPage({ page }) {
   const { dataSource } = useDataMode()
   const { user } = useAuth()
   const isAdministrator = user?.role === 'administrator'
-  const [silos, setSilos] = useState(demoSilos)
-  const [alerts, setAlerts] = useState(demoAlerts)
+  const [silos, setSilos] = useState([])
+  const [alerts, setAlerts] = useState([])
   const [users, setUsers] = useState([])
   const [inspections, setInspections] = useState([])
   const [history, setHistory] = useState([])
@@ -35,6 +34,7 @@ export function ContentPage({ page }) {
   const [reportPage, setReportPage] = useState(1)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -85,13 +85,19 @@ export function ContentPage({ page }) {
     if (!request) return undefined
     request().then(() => {
       if (active) {
+        setLoadError('')
         setApiReady(true)
         setLoadedDataSource(dataSource)
       }
     }).catch((error) => {
       if (active) {
         const detail = error.response?.data?.detail || 'The local API could not load this page. Check the connection and try again.'
+        setLoadError(detail)
         setApiReady(false)
+        setLoadedDataSource(dataSource)
+        setSilos([])
+        setAlerts([])
+        setHistory([])
         if (page === 'reports') setReportError(detail)
         else setMessage(detail)
       }
@@ -185,9 +191,8 @@ export function ContentPage({ page }) {
   const [title, description, tab] = pageCopy[page]
   const pageSilos = loadedDataSource === dataSource
     ? silos
-    : loadedDataSource === null && dataSource === 'simulation'
-      ? demoSilos
-      : []
+    : []
+  const pageHistory = loadedDataSource === dataSource ? history : []
   const filteredSilos = pageSilos.filter((silo) => `${silo.name} ${silo.location} ${silo.grain_type}`.toLowerCase().includes(search.toLowerCase()))
   const averageOf = (field, digits = 1) => {
     const values = pageSilos.map((silo) => silo.latest_reading?.[field]).filter(Number.isFinite)
@@ -278,7 +283,7 @@ export function ContentPage({ page }) {
           </>}
         </div>
       </div>
-      <SimulatedDataNotice>{dataSource === 'simulation' ? 'Generated readings are for demonstration only; no physical sensor is connected.' : dataSource === 'hardware' ? 'Hardware mode is selected, but no ESP32/DHT22 integration or device is connected.' : 'Manually entered values are labeled Manual; no physical sensor is connected.'}</SimulatedDataNotice>
+      <SimulatedDataNotice>{loadError ? 'The monitoring service could not load this page. Review the message below.' : loadedDataSource !== dataSource ? 'Loading data from the monitoring service…' : dataSource === 'simulation' ? `${pageSilos.length} assigned demonstration silos are available. No physical sensors are connected.` : dataSource === 'hardware' ? 'Hardware mode is selected, but no sensor integration is connected. Live readings will appear after a supported device is configured.' : 'Manual mode displays values entered by authorized users. These records are labeled as manually entered.'}</SimulatedDataNotice>
       {message && <div className="inline-notice" role="status">{message}</div>}
 
       {page === 'silos' && (
@@ -297,7 +302,7 @@ export function ContentPage({ page }) {
 
       {page === 'monitoring' && <>
         <div className="metric-grid compact-metrics">{[['Temperature', averageOf('temperature_c'), 'Air temperature'], ['Air humidity', averageOf('humidity_percent'), 'Relative humidity'], ['Grain moisture', averageOf('grain_moisture_percent'), 'Moisture content']].map(([label, value, note]) => <article className="metric-card" key={label}><div className="metric-top">{label}<span className="metric-icon green"><Activity size={18} /></span></div><div className="metric-value">{value}</div><div className="metric-bottom">{note}</div></article>)}</div>
-        <section className="panel trend-panel content-panel"><div className="panel-heading"><div><h2>Temperature & humidity history</h2><p>{dataSource === 'simulation' ? 'Simulated sample readings' : `${dataSource} data-source readings`}</p></div><span className="chart-axis-caption">Left: °C · Right: %</span></div><div className="large-chart chart-watermark-wrap">{dataSource === 'simulation' && <span className="chart-watermark">SIMULATED DATA</span>}{!history.length && <span className="chart-empty">{dataSource === 'hardware' ? 'No hardware readings received.' : 'No readings available for this data source.'}</span>}<ResponsiveContainer width="100%" height="100%"><LineChart data={history}><CartesianGrid stroke="#edf1ed" vertical={false} /><XAxis dataKey="time" tickLine={false} axisLine={false} /><YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} /><YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} /><Tooltip /><Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature °C" stroke="#28814d" strokeDasharray={dataSource === 'simulation' ? '5 4' : undefined} dot={false} isAnimationActive={false} /><Line yAxisId="humidity" type="monotone" dataKey="humidity" name="Humidity %" stroke="#76a4ce" strokeDasharray={dataSource === 'simulation' ? '5 4' : undefined} dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div></section>
+        <section className="panel trend-panel content-panel"><div className="panel-heading"><div><h2>Temperature & humidity history</h2><p>{dataSource === 'simulation' ? 'Generated sample readings' : `${sourceNames[dataSource]} readings`}</p></div><span className="chart-axis-caption">Left: °C · Right: %</span></div><div className="large-chart chart-watermark-wrap">{dataSource === 'simulation' && <span className="chart-watermark">SIMULATED DATA</span>}{!pageHistory.length && <span className="chart-empty" role="status">{loadedDataSource !== dataSource ? 'Loading readings from the monitoring service…' : loadError ? 'Readings could not be loaded. Check the service connection and try again.' : dataSource === 'hardware' ? 'No sensor readings have been received. Configure a supported device to view live data.' : dataSource === 'simulation' ? 'No simulated readings are available for the selected silos.' : 'No manual readings are available. Add a reading to view it here.'}</span>}<ResponsiveContainer width="100%" height="100%"><LineChart data={pageHistory}><CartesianGrid stroke="#edf1ed" vertical={false} /><XAxis dataKey="time" tickLine={false} axisLine={false} /><YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} /><YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} /><Tooltip /><Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature °C" stroke="#28814d" strokeDasharray={dataSource === 'simulation' ? '5 4' : undefined} dot={false} isAnimationActive={false} /><Line yAxisId="humidity" type="monotone" dataKey="humidity" name="Humidity %" stroke="#76a4ce" strokeDasharray={dataSource === 'simulation' ? '5 4' : undefined} dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div></section>
         {dataSource === 'manual' && <section className="panel content-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Saved values are labeled Manual and are never presented as sensor measurements.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><label>Grain moisture (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.grain_moisture_percent} onChange={(event) => setReadingForm({ ...readingForm, grain_moisture_percent: event.target.value })} /></label><button className="button button-primary">Save manual reading</button></form></section>}
         <section className="panel content-panel"><div className="panel-heading"><div><h2>Inspection & maintenance log</h2><p>Record operator work and keep a history by silo.</p></div></div><form className="silo-form" onSubmit={submitInspection}><label>Silo<select required value={inspectionForm.silo_id} onChange={(event) => setInspectionForm({ ...inspectionForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Activity<select value={inspectionForm.activity_type} onChange={(event) => setInspectionForm({ ...inspectionForm, activity_type: event.target.value })}><option value="inspection">Inspection</option><option value="maintenance">Maintenance</option><option value="cleaning">Cleaning</option><option value="other">Other</option></select></label><label>Notes<input required value={inspectionForm.notes} onChange={(event) => setInspectionForm({ ...inspectionForm, notes: event.target.value })} placeholder="Work performed or observations" /></label><button className="button button-primary">Save record</button></form>{inspections.length > 0 && <div className="inspection-list">{inspections.map((item) => <p key={item.id}><strong>{pageSilos.find((silo) => silo.id === item.silo_id)?.name || `Silo ${item.silo_id}`}</strong> · {item.activity_type} — {item.notes}</p>)}</div>}</section>
         <SiloTable silos={pageSilos} />
@@ -392,7 +397,7 @@ export function ContentPage({ page }) {
 
       {page === 'settings' && <section className="panel content-panel settings-list"><div className="panel-heading"><div><h2>Alert thresholds</h2><p>Default silo threshold configuration</p></div><Settings size={19} /></div><div className="setting-row"><div><strong>Temperature warning</strong><small>Alert when silo temperature rises above this value</small></div><span>24 °C</span></div><div className="setting-row"><div><strong>Temperature critical</strong><small>Critical alert threshold for grain storage</small></div><span>28 °C</span></div><div className="setting-row"><div><strong>Humidity warning</strong><small>Alert when relative humidity rises above this value</small></div><span>65 %</span></div><div className="setting-row"><div><strong>Humidity critical</strong><small>Critical alert threshold for relative humidity</small></div><span>72 %</span></div><p className="page-footnote">Thresholds can be configured per silo through the API. This settings preview is read-only.</p></section>}
 
-      <p className={`page-footnote system-status${apiReady ? ' operational' : ''}`}><Activity size={14} /> <span className="system-status-dot" /> System status: {apiReady ? 'Operational' : reportError ? 'Unavailable' : 'Connecting'}</p>
+      <p className={`page-footnote system-status${apiReady && loadedDataSource === dataSource ? ' operational' : ''}`}><Activity size={14} /> <span className="system-status-dot" /> System status: {apiReady && loadedDataSource === dataSource ? 'Operational' : reportError ? 'Unavailable' : 'Connecting'}</p>
     </>
   )
 }
