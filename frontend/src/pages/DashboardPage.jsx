@@ -23,10 +23,14 @@ export function DashboardPage({ operatorMode = false }) {
   const visibleSilos = silos
   const siloIds = new Set(visibleSilos.map((silo) => silo.id))
   const visibleAlerts = alerts.filter((alert) => siloIds.has(alert.silo_id))
-  const activeAlerts = visibleAlerts.filter((alert) => !alert.acknowledged && !alert.resolved)
+  const activeAlerts = visibleAlerts.filter((alert) => !alert.resolved)
   const criticalCount = activeAlerts.filter((alert) => alert.severity === 'critical').length
   const warningCount = activeAlerts.filter((alert) => alert.severity === 'warning').length
   const activeThresholdCount = criticalCount + warningCount
+  const activeAlertSummary = [
+    criticalCount > 0 && `${criticalCount} Critical`,
+    warningCount > 0 && `${warningCount} Warning`,
+  ].filter(Boolean).join(' / ') || '0 Critical'
   const averageTemperature = numberAverage(visibleSilos.map((silo) => silo.temperature).filter(Number.isFinite))
   const averageHumidity = numberAverage(visibleSilos.map((silo) => silo.humidity).filter(Number.isFinite))
   const averageMoisture = numberAverage(visibleSilos.map((silo) => silo.grain_moisture_percent).filter(Number.isFinite))
@@ -65,7 +69,7 @@ export function DashboardPage({ operatorMode = false }) {
         <MetricCard label="Avg. temperature" value={averageTemperature == null ? '—' : `${averageTemperature.toFixed(1)}°C`} note="Air temperature" icon={Thermometer} style="blue" />
         <MetricCard label="Avg. air humidity" value={averageHumidity == null ? '—' : `${Math.round(averageHumidity)}%`} note="Relative humidity" icon={Droplets} style="purple" />
         <MetricCard label="Avg. grain moisture" value={averageMoisture == null ? '—' : `${averageMoisture.toFixed(1)}%`} note="Grain moisture content" icon={Activity} style="green" />
-        <MetricCard label="Active alerts" value={`${criticalCount} Critical / ${warningCount} Warning`} note={`${activeThresholdCount} unacknowledged warnings or criticals`} icon={CircleAlert} style="orange" alertValue />
+        <MetricCard label="Active alerts" value={activeAlertSummary} note={`${activeThresholdCount} unresolved alerts`} icon={CircleAlert} style="orange" alertValue />
       </section>
 
       <div className="dashboard-grid">
@@ -91,9 +95,9 @@ export function DashboardPage({ operatorMode = false }) {
         </section>
 
         <section className="panel alert-panel">
-          <div className="panel-heading"><div><h2>Recent alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Unacknowledged and unresolved</p></div><a className="text-link" href="/alerts">View all <ArrowRight size={14} /></a></div>
-          <div className="alert-list">{visibleAlerts.slice(0, 4).map((alert) => (
-            <div className={`alert-item${alert.resolved ? ' alert-resolved' : ''}`} key={alert.id}>
+          <div className="panel-heading"><div><h2>Recent alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Active problems · resolved alerts are hidden</p></div><a className="text-link" href="/alerts">View all <ArrowRight size={14} /></a></div>
+          <div className="alert-list">{activeAlerts.slice(0, 4).map((alert) => (
+            <div className="alert-item" key={alert.id}>
               <span className={`alert-symbol ${alert.severity}`}>{alert.severity === 'critical' ? '!' : alert.severity === 'warning' ? '↑' : 'i'}</span>
               <div className="alert-description">
                 <div><strong>{alert.silo_name || 'Storage alert'}</strong><StatusBadge status={alert.severity} /></div>
