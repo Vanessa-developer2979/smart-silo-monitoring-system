@@ -3,7 +3,6 @@ from datetime import timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models import Alert, SensorReading, Silo, User, utc_now
 
 LOCAL_SILO_NAME = "Local Silo"
@@ -80,8 +79,6 @@ def seed_demo_data(db: Session) -> None:
     for user in db.scalars(select(User)).all():
         if user.email.endswith("@example.test") and user.password_hash is None:
             user.is_active = False
-        elif settings.demo_mode_enabled and user.is_active and user.role == "operator" and not user.assigned_silos:
-            user.assigned_silos.extend(silo_by_name[name] for name, *_ in DEMO_SILOS)
 
     if not db.scalar(select(Alert.id).limit(1)):
         silo_by_name[LOCAL_SILO_NAME].alerts.append(

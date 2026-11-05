@@ -82,10 +82,11 @@ export function ContentPage({ page }) {
   const isAdministrator = user?.role === 'administrator'
   const [silos, setSilos] = useState([])
   const [alerts, setAlerts] = useState([])
-  const [alertFilter, setAlertFilter] = useState('active')
+  const [alertFilter, setAlertFilter] = useState('all')
   const [users, setUsers] = useState([])
   const [inspections, setInspections] = useState([])
   const [history, setHistory] = useState([])
+  const [readingLog, setReadingLog] = useState([])
   const [report, setReport] = useState(null)
   const [reportPeriod, setReportPeriod] = useState('7d')
   const [reportPage, setReportPage] = useState(1)
@@ -118,13 +119,17 @@ export function ContentPage({ page }) {
       users: () => userService.list().then(setUsers),
       reports: () => {
         setReport(null)
+        setReadingLog([])
         setReportError('')
         setReportLoading(true)
-        return reportService.history({
-            period: reportPeriod,
-            data_source: dataSource,
-          }).then((data) => {
-            if (active) setReport(data)
+        return Promise.all([
+          reportService.history({ period: reportPeriod, data_source: dataSource }),
+          reportService.history({ period: reportPeriod }),
+        ]).then(([data, allReadings]) => {
+          if (active) {
+            setReport(data)
+            setReadingLog(allReadings.readings)
+          }
         }).finally(() => {
           if (active) setReportLoading(false)
         })
@@ -154,7 +159,10 @@ export function ContentPage({ page }) {
         setAlerts([])
         setHistory([])
         setInspections([])
-        if (page === 'reports') setReportError(detail)
+        if (page === 'reports') {
+          setReadingLog([])
+          setReportError(detail)
+        }
         else setMessage(detail)
       }
     })
@@ -300,8 +308,8 @@ export function ContentPage({ page }) {
     alertFilter === 'all' || (alertFilter === 'resolved' ? alert.resolved : !alert.resolved)
   ))
   const reportPageSize = 10
-  const reportPageCount = Math.max(1, Math.ceil(reportReadings.length / reportPageSize))
-  const visibleReportReadings = reportReadings.slice((reportPage - 1) * reportPageSize, reportPage * reportPageSize)
+  const reportPageCount = Math.max(1, Math.ceil(readingLog.length / reportPageSize))
+  const visibleReportReadings = readingLog.slice((reportPage - 1) * reportPageSize, reportPage * reportPageSize)
   const reportCharts = buildReportCharts(reportReadings, [])
 
   const exportReportCsv = () => {
@@ -433,9 +441,9 @@ export function ContentPage({ page }) {
 
       {page === 'alerts' && (
         <section className="panel content-panel">
-          <div className="panel-heading"><div><h2>Alerts</h2><p>Acknowledge an alert, inspect the silo, then resolve it when the issue is addressed.</p></div></div>
+          <div className="panel-heading"><div><h2>Alerts</h2><p>{isAdministrator ? 'Acknowledge alerts, inspect the silo, then resolve each issue when it is addressed.' : 'Review alert status for your assigned silos. An administrator manages alert actions.'}</p></div></div>
           <div className="alert-filter-tabs" role="tablist" aria-label="Filter alerts">
-            {[['active', 'Active'], ['resolved', 'Resolved'], ['all', 'All']].map(([value, label]) => (
+            {[['all', 'All'], ['active', 'Active'], ['resolved', 'Resolved']].map(([value, label]) => (
               <button
                 type="button"
                 role="tab"
@@ -457,10 +465,11 @@ export function ContentPage({ page }) {
                 <p>{alert.message}</p>
                 <small>{formatAlertDate(alert.created_at)}</small>
                 {alert.acknowledged && !alert.resolved && <small className="alert-next-step">Acknowledged · inspect the silo before resolving</small>}
+                {!isAdministrator && !alert.acknowledged && !alert.resolved && <small className="alert-view-status">Awaiting administrator action</small>}
               </div>
               <div className="full-alert-actions">
-                {!alert.resolved && !alert.acknowledged && <button className="button button-primary" onClick={() => acknowledge(alert.id)}><Check size={14} /> Acknowledge alert</button>}
-                {!alert.resolved && alert.acknowledged && <button className="button button-primary" onClick={() => resolveAlert(alert.id)}>Resolve alert</button>}
+                {isAdministrator && !alert.resolved && !alert.acknowledged && <button className="button button-primary" onClick={() => acknowledge(alert.id)}><Check size={14} /> Acknowledge alert</button>}
+                {isAdministrator && !alert.resolved && alert.acknowledged && <button className="button button-primary" onClick={() => resolveAlert(alert.id)}>Resolve alert</button>}
               </div>
             </article>
           ))}</div>
@@ -484,49 +493,51 @@ export function ContentPage({ page }) {
             <h2>Unable to Load Report</h2>
             <p>{reportError}</p>
           </section>
-        ) : reportReadings.length === 0 ? (
-          <section className="panel content-panel report-empty-state">
-            <Warehouse size={28} />
-            <h2>No Data Available</h2>
-            <p>No readings match the selected silo, source, and date range.</p>
-            {dataSource === 'simulation' && <span>Simulation readings are generated demonstration data, not physical sensor measurements.</span>}
-          </section>
         ) : (
           <>
-            <section className="panel content-panel report-chart-panel">
-              <div className="panel-heading">
-                <div><h2>Historical Storage Conditions</h2><p>{report.reading_count} readings across {report.silo_count} silos · charts shown separately for each silo</p></div>
-                <span className="status-badge info">{dataSource === 'simulation' ? 'Simulation Mode Active' : `${dataSource} mode selected`}</span>
-              </div>
-              <div className="report-silo-charts">
-                {reportCharts.map((chart) => (
-                  <section className="report-silo-chart" key={chart.id} aria-label={`${chart.name} historical conditions`}>
-                    <h3>{chart.name}</h3>
-                    <div className="report-legend">
-                      <span><i className="report-legend-temp" /> Temperature (°C)</span>
-                      <span><i className="report-legend-humidity" /> Air humidity (%)</span>
-                      <span><i className="report-legend-moisture" /> Grain moisture (%)</span>
-                    </div>
-                    <div className="large-chart report-chart">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chart.readings} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
-                          <CartesianGrid stroke="#edf1ed" vertical={false} />
-                          <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={30} />
-                          <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} label={{ value: '°C', angle: -90, position: 'insideLeft' }} />
-                          <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} label={{ value: '%', angle: 90, position: 'insideRight' }} />
-                          <Tooltip />
-                          <Line yAxisId="temperature" type="monotone" dataKey="temperature" name={`${chart.name} temperature (°C)`} stroke="#28814d" strokeWidth={2.2} dot={false} isAnimationActive={false} />
-                          <Line yAxisId="percent" type="monotone" dataKey="humidity" name={`${chart.name} air humidity (%)`} stroke="#76a4ce" strokeWidth={2} dot={false} isAnimationActive={false} />
-                          <Line yAxisId="percent" type="monotone" dataKey="moisture" name={`${chart.name} grain moisture (%)`} stroke="#c58b3b" strokeWidth={2} dot={false} isAnimationActive={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </section>
-                ))}
-              </div>
-            </section>
+            {reportReadings.length ? (
+              <section className="panel content-panel report-chart-panel">
+                <div className="panel-heading">
+                  <div><h2>Historical Storage Conditions</h2><p>{report.reading_count} {sourceNames[dataSource]?.toLowerCase() || dataSource} readings across {report.silo_count} silos · charts shown separately for each silo</p></div>
+                  <span className="status-badge info">{dataSource === 'simulation' ? 'Simulation Mode Active' : `${sourceNames[dataSource] || dataSource} mode selected`}</span>
+                </div>
+                <div className="report-silo-charts">
+                  {reportCharts.map((chart) => (
+                    <section className="report-silo-chart" key={chart.id} aria-label={`${chart.name} historical conditions`}>
+                      <h3>{chart.name}</h3>
+                      <div className="report-legend">
+                        <span><i className="report-legend-temp" /> Temperature (°C)</span>
+                        <span><i className="report-legend-humidity" /> Air humidity (%)</span>
+                        <span><i className="report-legend-moisture" /> Grain moisture (%)</span>
+                      </div>
+                      <div className="large-chart report-chart">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chart.readings} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
+                            <CartesianGrid stroke="#edf1ed" vertical={false} />
+                            <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={30} />
+                            <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} label={{ value: '°C', angle: -90, position: 'insideLeft' }} />
+                            <YAxis yAxisId="percent" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} label={{ value: '%', angle: 90, position: 'insideRight' }} />
+                            <Tooltip />
+                            <Line yAxisId="temperature" type="monotone" dataKey="temperature" name={`${chart.name} temperature (°C)`} stroke="#28814d" strokeWidth={2.2} dot={false} isAnimationActive={false} />
+                            <Line yAxisId="percent" type="monotone" dataKey="humidity" name={`${chart.name} air humidity (%)`} stroke="#76a4ce" strokeWidth={2} dot={false} isAnimationActive={false} />
+                            <Line yAxisId="percent" type="monotone" dataKey="moisture" name={`${chart.name} grain moisture (%)`} stroke="#c58b3b" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <section className="panel content-panel report-empty-state">
+                <Warehouse size={28} />
+                <h2>No {sourceNames[dataSource]?.toLowerCase() || dataSource} chart data</h2>
+                <p>No readings in the selected mode and date range. The historical log below includes saved readings from every data source.</p>
+                {dataSource === 'simulation' && <span>Simulation readings are generated demonstration data, not physical sensor measurements.</span>}
+              </section>
+            )}
             <section className="panel content-panel report-table-panel">
-              <div className="panel-heading"><div><h2>Historical reading log</h2><p>Raw readings from the selected period and data source</p></div><span className="status-badge info">{report.reading_count} records</span></div>
+              <div className="panel-heading"><div><h2>Historical reading log</h2><p>Saved readings from all data sources in the selected date range</p></div><span className="status-badge info">{readingLog.length} records</span></div>
               <div className="table-scroll">
                 <table>
                   <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>DATA SOURCE</th><th>STATUS</th></tr></thead>
@@ -542,16 +553,16 @@ export function ContentPage({ page }) {
                       <td><span className={`source-badge ${reading.data_source}`}>{sourceNames[reading.data_source] || reading.data_source}</span></td>
                       <td><StatusBadge status={reading.status} /></td>
                     </tr>
-                  })}</tbody>
+                  })}{!readingLog.length && <tr><td className="empty-table" colSpan="8">No readings have been recorded in this date range.</td></tr>}</tbody>
                 </table>
               </div>
               <div className="report-pagination">
-                <span>Showing {((reportPage - 1) * reportPageSize) + 1}–{Math.min(reportPage * reportPageSize, reportReadings.length)} of {reportReadings.length}</span>
-                <div>
+                <span>{readingLog.length ? `Showing ${((reportPage - 1) * reportPageSize) + 1}–${Math.min(reportPage * reportPageSize, readingLog.length)} of ${readingLog.length}` : 'No readings to display'}</span>
+                {readingLog.length > reportPageSize && <div>
                   <button className="button button-secondary" aria-label="Previous report page" disabled={reportPage <= 1} onClick={() => setReportPage((current) => Math.max(1, current - 1))}><ChevronLeft size={15} /> Previous</button>
                   <span>Page {reportPage} of {reportPageCount}</span>
                   <button className="button button-secondary" aria-label="Next report page" disabled={reportPage >= reportPageCount} onClick={() => setReportPage((current) => Math.min(reportPageCount, current + 1))}>Next <ChevronRight size={15} /></button>
-                </div>
+                </div>}
               </div>
             </section>
           </>

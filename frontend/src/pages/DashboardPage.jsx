@@ -20,6 +20,7 @@ const sourceLabel = (source) => ({
 export function DashboardPage({ operatorMode = false }) {
   const { silos, alerts, actionError, acknowledge, resolve, dataSource } = useDashboardData()
   const { user } = useAuth()
+  const isAdministrator = user?.role === 'administrator'
   const visibleSilos = silos
   const siloIds = new Set(visibleSilos.map((silo) => silo.id))
   const visibleAlerts = alerts.filter((alert) => siloIds.has(alert.silo_id))
@@ -88,8 +89,10 @@ export function DashboardPage({ operatorMode = false }) {
                   <div><strong>{alert.silo_name || 'Storage alert'}</strong><StatusBadge status={alert.severity} /></div>
                   <p>{alert.message}</p><small>{new Date(alert.created_at).toLocaleString('en-MW', { timeZone: 'Africa/Blantyre' })}</small>
                   <div className="alert-actions">
-                    {!alert.acknowledged && !alert.resolved && <button className="mini-action" onClick={() => acknowledgeAlert(alert.id)}>Acknowledge</button>}
-                    {alert.acknowledged && !alert.resolved && <button className="mini-action resolve-action" onClick={() => resolveAlert(alert.id)}>Resolve</button>}
+                    {!isAdministrator && !alert.acknowledged && !alert.resolved && <span className="alert-view-status">Awaiting administrator action</span>}
+                    {isAdministrator && !alert.acknowledged && !alert.resolved && <button className="mini-action" onClick={() => acknowledgeAlert(alert.id)}>Acknowledge</button>}
+                    {isAdministrator && alert.acknowledged && !alert.resolved && <button className="mini-action resolve-action" onClick={() => resolveAlert(alert.id)}>Resolve</button>}
+                    {alert.acknowledged && <span className="acknowledged-tag">Acknowledged</span>}
                     {alert.resolved && <span className="resolved-label">Resolved</span>}
                   </div>
                 </div>

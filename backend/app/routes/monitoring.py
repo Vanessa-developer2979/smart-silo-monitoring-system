@@ -132,12 +132,10 @@ def create_alert(payload: AlertCreate, db: Session = Depends(get_db), _: User = 
 
 
 @router.patch("/alerts/{alert_id}/acknowledge", response_model=AlertRead)
-def acknowledge_alert(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def acknowledge_alert(alert_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     alert = db.get(Alert, alert_id)
     if alert is None:
         raise HTTPException(status_code=404, detail="Alert not found.")
-    if current_user.role != "administrator" and alert.silo not in current_user.assigned_silos:
-        raise HTTPException(status_code=403, detail="This alert is outside your assigned silos.")
     alert.acknowledged = True
     db.commit()
     db.refresh(alert)
@@ -145,12 +143,10 @@ def acknowledge_alert(alert_id: int, db: Session = Depends(get_db), current_user
 
 
 @router.patch("/alerts/{alert_id}/resolve", response_model=AlertRead)
-def resolve_alert(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def resolve_alert(alert_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     alert = db.get(Alert, alert_id)
     if alert is None:
         raise HTTPException(status_code=404, detail="Alert not found.")
-    if current_user.role != "administrator" and alert.silo not in current_user.assigned_silos:
-        raise HTTPException(status_code=403, detail="This alert is outside your assigned silos.")
     alert.resolved = True
     db.commit()
     db.refresh(alert)

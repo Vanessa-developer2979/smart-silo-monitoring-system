@@ -5,11 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Silo, User
+from app.models import User
 from app.schemas import AuthResponse, LoginRequest, UserRead, UserRegistration
 from app.security import create_access_token, hash_password, verify_password
-from app.config import settings
-from app.services.seed import DEMO_SILOS
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -26,9 +24,6 @@ def register(payload: UserRegistration, db: Session = Depends(get_db)):
         role="operator",
         password_hash=hash_password(payload.password),
     )
-    if settings.demo_mode_enabled:
-        demo_names = [name for name, *_ in DEMO_SILOS]
-        user.assigned_silos.extend(db.scalars(select(Silo).where(Silo.name.in_(demo_names))).all())
     db.add(user)
     try:
         db.commit()
