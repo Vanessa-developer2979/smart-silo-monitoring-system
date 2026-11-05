@@ -728,6 +728,10 @@
 }
 
 @media (min-width: 801px) {
+  .metric-grid:not(.compact-metrics) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .dashboard-grid {
     align-items: stretch;
   }

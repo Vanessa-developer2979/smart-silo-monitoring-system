@@ -73,7 +73,6 @@ export function DashboardPage({ operatorMode = false }) {
       {actionError && <div className="inline-notice" role="alert">{actionError}</div>}
 
       <section className="metric-grid">
-        <MetricCard label="Active silos" value={visibleSilos.length.toString().padStart(2, '0')} note="Across assigned locations" icon={Warehouse} style="green" />
         <MetricCard label="Avg. temperature" value={averageTemperature == null ? '—' : `${averageTemperature.toFixed(1)}°C`} note="Air temperature" icon={Thermometer} style="blue" dataSource={dataSource} />
         <MetricCard label="Avg. air humidity" value={averageHumidity == null ? '—' : `${Math.round(averageHumidity)}%`} note="Relative humidity" icon={Droplets} style="purple" dataSource={dataSource} />
         <MetricCard label="Avg. grain moisture" value={averageMoisture == null ? '—' : `${averageMoisture.toFixed(1)}%`} note="Grain moisture content" icon={Activity} style="green" dataSource={dataSource} />
@@ -100,7 +99,7 @@ export function DashboardPage({ operatorMode = false }) {
       </section>
 
       <section className="panel silo-panel">
-        <div className="panel-heading"><div><h2>{operatorMode ? 'Assigned silo health' : 'Silo health'}</h2><p>Latest readings, fill level, and connection state</p></div><a className="text-link" href="/silos">All silos <ArrowRight size={14} /></a></div>
+        <div className="panel-heading"><div><h2>Local silo health</h2><p>Latest readings, fill level, and connection state</p></div><a className="text-link" href="/silos">Local silo details <ArrowRight size={14} /></a></div>
         <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>
           {visibleSilos.map((silo) => {
             const moisture = silo.grain_moisture_percent

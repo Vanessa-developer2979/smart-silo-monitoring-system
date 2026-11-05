@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Search, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
+import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
@@ -12,7 +12,7 @@ import { chartTickInterval, formatReadingHistory } from '../utils/chartReadings.
 import './reports.css'
 
 const pageCopy = {
-  silos: ['Silo management', 'Manage your storage locations, grain types, and capacity.', 'Silos'],
+  silos: ['Local silo management', 'Manage details and capacity for the Local Silo.', 'Silos'],
   monitoring: ['Live monitoring', 'Track temperature and humidity across your storage network.', 'Monitoring'],
   alerts: ['Alerts & events', 'Review conditions that may need your attention.', 'Alerts'],
   reports: ['Monitoring reports', 'Review and export trends from your silo network.', 'Reports'],
@@ -98,7 +98,6 @@ export function ContentPage({ page }) {
   const [loadError, setLoadError] = useState('')
   const [message, setMessage] = useState('')
   const [successToast, setSuccessToast] = useState('')
-  const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -125,18 +124,21 @@ export function ContentPage({ page }) {
         setReport(null)
         setReportError('')
         setReportLoading(true)
-        return Promise.all([
-          siloService.list(dataSource).then((items) => {
-            if (active) setReportSilos(items)
-          }),
-          reportService.history({
+        return siloService.list(dataSource).then((items) => {
+          if (!active) return
+          setReportSilos(items)
+          const selectedSiloId = isAdministrator
+            ? reportSiloId || (items[0] ? String(items[0].id) : '')
+            : ''
+          if (isAdministrator && !reportSiloId && selectedSiloId) setReportSiloId(selectedSiloId)
+          return reportService.history({
             period: reportPeriod,
             data_source: dataSource,
-            ...(reportSiloId ? { silo_id: Number(reportSiloId) } : {}),
+            ...(selectedSiloId ? { silo_id: Number(selectedSiloId) } : {}),
           }).then((data) => {
             if (active) setReport(data)
-          }),
-        ]).finally(() => {
+          })
+        }).finally(() => {
           if (active) setReportLoading(false)
         })
       },
@@ -155,7 +157,9 @@ export function ContentPage({ page }) {
       }
     }).catch((error) => {
       if (active) {
-        const detail = error.response?.data?.detail || 'The local API could not load this page. Check the connection and try again.'
+      const detail = page === 'alerts'
+        ? 'Alerts are temporarily unavailable. Please check your connection and try again.'
+        : error.response?.data?.detail || 'The local API could not load this page. Check the connection and try again.'
         setLoadError(detail)
         setApiReady(false)
         setLoadedDataSource(dataSource)
@@ -168,7 +172,7 @@ export function ContentPage({ page }) {
       }
     })
     return () => { active = false }
-  }, [page, dataSource, reportPeriod, reportSiloId])
+  }, [page, dataSource, reportPeriod, reportSiloId, isAdministrator])
 
   const submitSilo = async (event) => {
     event.preventDefault()
@@ -294,7 +298,6 @@ export function ContentPage({ page }) {
     : []
   const pageHistory = loadedDataSource === dataSource ? history : []
   const pageChartInterval = chartTickInterval(pageHistory.length)
-  const filteredSilos = pageSilos.filter((silo) => `${silo.name} ${silo.location} ${silo.grain_type}`.toLowerCase().includes(search.toLowerCase()))
   const averageOf = (field, digits = 1) => {
     const values = pageSilos.map((silo) => silo.latest_reading?.[field]).filter(Number.isFinite)
     return values.length ? `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(digits)}${field === 'temperature_c' ? '°C' : '%'}` : '—'
@@ -350,12 +353,11 @@ export function ContentPage({ page }) {
           {page === 'silos' && isAdministrator && <button className="button button-primary" onClick={() => setShowForm((value) => !value)}><Plus size={17} /> Register silo</button>}
           {page === 'users' && <button className="button button-primary" onClick={() => setShowUserForm((value) => !value)}><UserPlus size={16} /> Add user record</button>}
           {page === 'reports' && <>
-            <label className="report-control">Silo
+            {isAdministrator && <label className="report-control">Silo
               <select aria-label="Filter reports by silo" value={reportSiloId} onChange={(event) => { setReportPage(1); setReportSiloId(event.target.value) }}>
-                <option value="">All Silos</option>
                 {reportSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}
               </select>
-            </label>
+            </label>}
             <label className="report-control">Date range
               <select aria-label="Report date range" value={reportPeriod} onChange={(event) => { setReportPage(1); setReportPeriod(event.target.value) }}>
                 <option value="24h">Last 24 Hours</option>
@@ -376,7 +378,7 @@ export function ContentPage({ page }) {
 
       {page === 'silos' && (
         <section className="panel silo-panel content-panel">
-          <div className="panel-heading"><div><h2>Registered silos</h2></div><label className="search-box"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search silos" /></label></div>
+          <div className="panel-heading"><div><h2>Local Silo</h2><p>Storage details and current readings for your local site.</p></div></div>
           {showForm && isAdministrator && <form className="silo-form" onSubmit={submitSilo}>
             <label>Silo name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. Lilongwe Silo 03" /></label>
             <label>Location<input required value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="District or region" /></label>
@@ -384,7 +386,7 @@ export function ContentPage({ page }) {
             <label>Capacity (tonnes)<input type="number" min="1" required value={form.capacity_tonnes} onChange={(event) => setForm({ ...form, capacity_tonnes: event.target.value })} /></label>
             <button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save silo'}</button>
           </form>}
-          <SiloTable silos={filteredSilos} />
+          <SiloTable silos={pageSilos} />
         </section>
       )}
 
@@ -584,5 +586,5 @@ export function ContentPage({ page }) {
 }
 
 function SiloTable({ silos }) {
-  return <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>HUMIDITY</th><th>GRAIN MOISTURE</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>{silos.map((silo) => <tr key={silo.id}><td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td><td>{silo.grain_type}</td><td><TemperatureReading value={silo.latest_reading?.temperature_c} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /></td><td>{silo.latest_reading ? `${silo.latest_reading.humidity_percent}%` : '—'}</td><td>{silo.latest_reading?.grain_moisture_percent != null ? <span className="moisture-cell">{silo.latest_reading.grain_moisture_percent}% <span className={`source-badge ${silo.latest_reading.data_source}`}>{sourceNames[silo.latest_reading.data_source]}</span></span> : '—'}</td><td><span className={(silo.capacity_percent || 0) > 90 ? 'capacity-high' : ''}>{silo.capacity_tonnes?.toLocaleString()} t · {silo.capacity_percent || 0}%</span></td><td><StatusBadge status={silo.connection_status || 'offline'} /></td></tr>)}</tbody></table>{silos.length === 0 && <div className="empty-state">No silos match that search.</div>}</div>
+  return <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>HUMIDITY</th><th>GRAIN MOISTURE</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>{silos.map((silo) => <tr key={silo.id}><td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td><td>{silo.grain_type}</td><td><TemperatureReading value={silo.latest_reading?.temperature_c} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /></td><td>{silo.latest_reading ? `${silo.latest_reading.humidity_percent}%` : '—'}</td><td>{silo.latest_reading?.grain_moisture_percent != null ? <span className="moisture-cell">{silo.latest_reading.grain_moisture_percent}% <span className={`source-badge ${silo.latest_reading.data_source}`}>{sourceNames[silo.latest_reading.data_source]}</span></span> : '—'}</td><td><span className={(silo.capacity_percent || 0) > 90 ? 'capacity-high' : ''}>{silo.capacity_tonnes?.toLocaleString()} t · {silo.capacity_percent || 0}%</span></td><td><StatusBadge status={silo.connection_status || 'offline'} /></td></tr>)}</tbody></table>{silos.length === 0 && <div className="empty-state">Local Silo is not available yet.</div>}</div>
 }
