@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Activity, ArrowRight, CircleAlert, ClipboardList, Clock3, Droplets, Download, Plus, Thermometer, Warehouse } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
+import { Activity, ArrowRight, CircleAlert, Droplets, Plus, Thermometer, Warehouse } from 'lucide-react'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { useDashboardData } from '../hooks/useDashboardData.js'
 import { useAuth } from '../hooks/useAuth.js'
-import { chartTickInterval } from '../utils/chartReadings.js'
 
 const numberAverage = (items) => items.length
   ? items.reduce((total, value) => total + value, 0) / items.length
@@ -20,7 +18,7 @@ const sourceLabel = (source) => ({
 }[source] || 'Unknown')
 
 export function DashboardPage({ operatorMode = false }) {
-  const { silos, alerts, history, recentActivity, apiState, isLoading, actionError, acknowledge, resolve, dataSource } = useDashboardData()
+  const { silos, alerts, actionError, acknowledge, resolve, dataSource } = useDashboardData()
   const { user } = useAuth()
   const visibleSilos = silos
   const siloIds = new Set(visibleSilos.map((silo) => silo.id))
@@ -36,18 +34,6 @@ export function DashboardPage({ operatorMode = false }) {
   const averageTemperature = numberAverage(visibleSilos.map((silo) => silo.temperature).filter(Number.isFinite))
   const averageHumidity = numberAverage(visibleSilos.map((silo) => silo.humidity).filter(Number.isFinite))
   const averageMoisture = numberAverage(visibleSilos.map((silo) => silo.grain_moisture_percent).filter(Number.isFinite))
-  const simulatedChart = dataSource === 'simulation'
-  const chartInterval = chartTickInterval(history.length)
-  const sourceWatermark = { manual: 'MANUAL DATA', hardware: 'LIVE HARDWARE DATA', simulation: 'SIMULATED DATA' }[dataSource]
-  const emptyReadingsMessage = isLoading
-    ? 'Loading readings from the monitoring service…'
-    : apiState === 'offline'
-      ? 'Readings could not be loaded. Check the service connection and try again.'
-      : dataSource === 'simulation'
-        ? 'No simulated readings are available for the selected silos.'
-        : dataSource === 'hardware'
-          ? 'No sensor readings have been received. Connect and configure a supported device to view live data.'
-          : 'No manual readings are available. Add a reading from the Monitoring page.'
   const [now, setNow] = useState(() => new Date())
   const [actionToast, setActionToast] = useState('')
   useEffect(() => {
@@ -78,7 +64,7 @@ export function DashboardPage({ operatorMode = false }) {
           <p>{operatorMode ? 'Monitoring overview for your assigned silos.' : 'An overview of storage conditions and active alerts.'}</p>
         </div>
         <div className="welcome-actions">
-          {!operatorMode && <button className="button button-secondary"><Download size={16} /> Export report</button>}
+          {user?.role === 'administrator' && <a className="button button-secondary" href="/reports">View reports</a>}
           {!operatorMode && <a className="button button-primary" href="/silos"><Plus size={17} /> Add silo</a>}
         </div>
       </div>
@@ -94,44 +80,9 @@ export function DashboardPage({ operatorMode = false }) {
         <MetricCard label="Active alerts" value={activeAlertSummary} note={`${activeThresholdCount} unresolved alerts`} icon={CircleAlert} style="orange" alertValue />
       </section>
 
-      <div className="dashboard-grid">
-        <section className="panel trend-panel">
-          <div className="panel-heading"><div><h2>Storage conditions</h2><p>Air temperature and relative humidity · selected data source</p>{simulatedChart && <p className="chart-mode-note">Data is simulated for demonstration. Averages are shown hourly.</p>}</div><select aria-label="Chart time range"><option>{simulatedChart ? 'Hourly Averages' : 'Latest readings'}</option></select></div>
-          <div className="chart-legend"><span><i className="legend-temp" /> Air temperature (°C)</span><span><i className="legend-hum" /> Relative humidity (%)</span></div>
-          <div className="chart-wrap chart-watermark-wrap">
-            <span className="chart-watermark">{sourceWatermark}</span>
-            {!history.length && <span className="chart-empty" role="status">{emptyReadingsMessage}</span>}
-            <ResponsiveContainer width="100%" height="100%">
-              {dataSource === 'manual' ? (
-                <ScatterChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
-                  <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} interval={chartInterval} minTickGap={30} />
-                  <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
-                  <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
-                  <Tooltip />
-                  <Scatter yAxisId="temperature" dataKey="temperature" name="Temperature °C" fill="#28814d" />
-                  <Scatter yAxisId="humidity" dataKey="humidity" name="Humidity %" fill="#76a4ce" />
-                </ScatterChart>
-              ) : (
-                <LineChart data={history} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
-                  <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fill: '#8a948d', fontSize: 10 }} interval={chartInterval} minTickGap={30} />
-                  <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} tick={{ fill: '#438055', fontSize: 10 }} label={{ value: '°C', angle: -90, position: 'insideLeft', fill: '#438055', fontSize: 10 }} />
-                  <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#5989b0', fontSize: 10 }} label={{ value: '%', angle: 90, position: 'insideRight', fill: '#5989b0', fontSize: 10 }} />
-                  <Tooltip />
-                  <Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature °C" stroke="#28814d" strokeWidth={2.2} strokeDasharray={simulatedChart ? '5 4' : undefined} dot={false} connectNulls={false} isAnimationActive={false} />
-                  <Line yAxisId="humidity" type="monotone" dataKey="humidity" name="Humidity %" stroke="#76a4ce" strokeWidth={2} strokeDasharray={simulatedChart ? '5 4' : undefined} dot={false} connectNulls={false} isAnimationActive={false} />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-footer"><span><Clock3 size={14} /> {apiState === 'connected' ? 'Latest available readings' : 'Waiting for monitoring service'}</span><span>{simulatedChart ? 'Dashed lines represent generated sample values' : 'Values are filtered by the selected data source'}</span></div>
-        </section>
-
-        <div className="dashboard-side-stack">
-          <section className="panel alert-panel">
-            <div className="panel-heading"><div><h2>Recent alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Active problems · resolved alerts are hidden</p></div><a className="text-link" href="/alerts">View all <ArrowRight size={14} /></a></div>
-            <div className="alert-list">{activeAlerts.slice(0, 4).map((alert) => (
+      <section className="panel dashboard-alerts">
+        <div className="panel-heading"><div><h2>Active alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Conditions that need attention across your silos</p></div><a className="text-link" href="/alerts">View all alerts <ArrowRight size={14} /></a></div>
+        <div className="alert-list">{activeAlerts.slice(0, 4).map((alert) => (
               <div className="alert-item" key={alert.id}>
                 <span className={`alert-symbol ${alert.severity}`}>{alert.severity === 'critical' ? '!' : alert.severity === 'warning' ? '↑' : 'i'}</span>
                 <div className="alert-description">
@@ -145,20 +96,8 @@ export function DashboardPage({ operatorMode = false }) {
                 </div>
               </div>
             ))}</div>
-            {!activeAlerts.length && <p className="activity-empty">No active alerts.</p>}
-          </section>
-          <section className="panel activity-panel">
-            <div className="panel-heading"><div><h2>Recent Activity</h2><p>{dataSource === 'simulation' ? 'Generated simulation readings' : dataSource === 'hardware' ? 'Latest sensor readings' : 'Manual readings and inspection records'}</p></div></div>
-            {isLoading ? <p className="activity-empty" role="status">Loading recent activity…</p> : apiState === 'offline' ? <p className="activity-empty" role="alert">Recent activity could not be loaded. Check the service connection.</p> : recentActivity.length ? <div className="activity-list">{recentActivity.map((item) => {
-              const Icon = item.type === 'reading' ? Droplets : ClipboardList
-              return <article className="activity-item" key={item.id}>
-                <span className={`activity-icon ${item.type}`}><Icon size={16} aria-hidden="true" /></span>
-                <div className="activity-description"><strong>{item.siloName}</strong><p>{item.description}</p><time dateTime={item.occurredAt}>{formatRelativeTime(item.occurredAt, now)}</time></div>
-              </article>
-            })}</div> : <p className="activity-empty">No recent activity.</p>}
-          </section>
-        </div>
-      </div>
+        {!activeAlerts.length && <p className="activity-empty">No active alerts. All monitored conditions are within their configured limits.</p>}
+      </section>
 
       <section className="panel silo-panel">
         <div className="panel-heading"><div><h2>{operatorMode ? 'Assigned silo health' : 'Silo health'}</h2><p>Latest readings, fill level, and connection state</p></div><a className="text-link" href="/silos">All silos <ArrowRight size={14} /></a></div>
@@ -181,15 +120,6 @@ export function DashboardPage({ operatorMode = false }) {
       </section>
     </>
   )
-}
-
-function formatRelativeTime(value, now) {
-  const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - new Date(value).getTime()) / 1000))
-  if (elapsedSeconds < 60) return 'Just now'
-  if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)} min ago`
-  if (elapsedSeconds < 86400) return `${Math.floor(elapsedSeconds / 3600)} hr ago`
-  if (elapsedSeconds < 604800) return `${Math.floor(elapsedSeconds / 86400)} days ago`
-  return new Intl.DateTimeFormat('en-MW', { month: 'short', day: 'numeric', timeZone: 'Africa/Blantyre' }).format(new Date(value))
 }
 
 function MetricCard({ label, value, note, icon: Icon, style, alertValue = false, dataSource }) {

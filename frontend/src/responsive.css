@@ -723,6 +723,10 @@
   min-width: 0;
 }
 
+.dashboard-alerts {
+  margin-bottom: 13px;
+}
+
 @media (min-width: 801px) {
   .dashboard-grid {
     align-items: stretch;

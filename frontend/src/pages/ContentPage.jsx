@@ -363,7 +363,7 @@ export function ContentPage({ page }) {
                 <option value="30d">Last 30 Days</option>
               </select>
             </label>
-            <button className="button button-primary" onClick={exportReportCsv} disabled={!reportReadings.length}><ArrowDownToLine size={16} /> Export CSV</button>
+            {isAdministrator && <button className="button button-primary" onClick={exportReportCsv} disabled={!reportReadings.length}><ArrowDownToLine size={16} /> Export CSV</button>}
           </>}
         </div>
       </div>
