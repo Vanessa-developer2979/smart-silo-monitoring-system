@@ -192,6 +192,19 @@
   line-height: 1;
 }
 
+.alert-toast {
+  border-color: #efc8c4;
+  background: #fff3f1;
+  color: #983f37;
+}
+
+.alert-next-step {
+  display: block;
+  margin-top: 5px;
+  color: #287447 !important;
+  font-weight: 650;
+}
+
 .data-source-badge {
   display: inline-flex;
   width: fit-content;

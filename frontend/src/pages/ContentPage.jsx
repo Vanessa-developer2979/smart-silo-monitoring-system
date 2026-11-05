@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
@@ -8,7 +8,6 @@ import { TemperatureReading } from '../components/dashboard/TemperatureReading.j
 import { alertService, inspectionService, notifyAlertsUpdated, readingService, reportService, siloService, userService } from '../services/api.js'
 import { useDataMode } from '../hooks/useDataMode.js'
 import { useAuth } from '../hooks/useAuth.js'
-import { chartTickInterval, formatReadingHistory } from '../utils/chartReadings.js'
 import './reports.css'
 
 const pageCopy = {
@@ -20,7 +19,6 @@ const pageCopy = {
   settings: ['Workspace settings', 'Configure thresholds and workspace preferences.', 'Settings'],
 }
 const sourceNames = { simulation: 'Simulated', hardware: 'Hardware', manual: 'Manual' }
-const sourceWatermarks = { simulation: 'SIMULATED DATA', hardware: 'LIVE HARDWARE DATA', manual: 'MANUAL DATA' }
 
 function formatAlertDate(value) {
   const date = new Date(value)
@@ -89,9 +87,7 @@ export function ContentPage({ page }) {
   const [inspections, setInspections] = useState([])
   const [history, setHistory] = useState([])
   const [report, setReport] = useState(null)
-  const [reportSilos, setReportSilos] = useState([])
   const [reportPeriod, setReportPeriod] = useState('7d')
-  const [reportSiloId, setReportSiloId] = useState('')
   const [reportPage, setReportPage] = useState(1)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
@@ -124,20 +120,11 @@ export function ContentPage({ page }) {
         setReport(null)
         setReportError('')
         setReportLoading(true)
-        return siloService.list(dataSource).then((items) => {
-          if (!active) return
-          setReportSilos(items)
-          const selectedSiloId = isAdministrator
-            ? reportSiloId || (items[0] ? String(items[0].id) : '')
-            : ''
-          if (isAdministrator && !reportSiloId && selectedSiloId) setReportSiloId(selectedSiloId)
-          return reportService.history({
+        return reportService.history({
             period: reportPeriod,
             data_source: dataSource,
-            ...(selectedSiloId ? { silo_id: Number(selectedSiloId) } : {}),
           }).then((data) => {
             if (active) setReport(data)
-          })
         }).finally(() => {
           if (active) setReportLoading(false)
         })
@@ -145,7 +132,7 @@ export function ContentPage({ page }) {
       monitoring: () => Promise.all([
         siloService.list(dataSource).then(setSilos),
         inspectionService.list().then(setInspections),
-        readingService.list(dataSource).then((items) => setHistory(formatReadingHistory(items, dataSource === 'simulation'))),
+        readingService.list(dataSource).then(setHistory),
       ]),
     }[page]
     if (!request) return undefined
@@ -172,7 +159,7 @@ export function ContentPage({ page }) {
       }
     })
     return () => { active = false }
-  }, [page, dataSource, reportPeriod, reportSiloId, isAdministrator])
+  }, [page, dataSource, reportPeriod])
 
   const submitSilo = async (event) => {
     event.preventDefault()
@@ -242,7 +229,15 @@ export function ContentPage({ page }) {
       setInspectionForm({ silo_id: '', activity_type: 'inspection', notes: '' })
       setSuccessToast('Inspection record saved successfully.')
     } catch (error) {
-      setMessage(error.response?.data?.detail || 'Could not save the inspection record.')
+      const status = error.response?.status
+      const detail = error.response?.data?.detail
+      setMessage(detail || (status === 403
+        ? 'You are not assigned to this silo. Ask an administrator to assign it to your account.'
+        : status === 404
+          ? 'The selected silo could not be found. Refresh the page and select it again.'
+          : status === 422
+            ? 'Check that you selected a silo and entered notes for this record.'
+            : 'Could not save the inspection record. Check your connection and try again.'))
     }
   }
 
@@ -260,8 +255,9 @@ export function ContentPage({ page }) {
   const submitReading = async (event) => {
     event.preventDefault()
     setMessage('')
+    let saved
     try {
-      await readingService.create({
+      saved = await readingService.create({
         ...readingForm,
         silo_id: Number(readingForm.silo_id),
         temperature_c: Number(readingForm.temperature_c),
@@ -275,20 +271,18 @@ export function ContentPage({ page }) {
     }
 
     setReadingForm({ silo_id: '', temperature_c: '', humidity_percent: '', grain_moisture_percent: '' })
+    setHistory((items) => [saved, ...items.filter((item) => item.id !== saved.id)])
     setSuccessToast('Reading saved successfully.')
     try {
-      const [updatedSilos, readings] = await Promise.all([
-        siloService.list('manual'),
-        readingService.list('manual'),
-      ])
-      setSilos(updatedSilos)
-      setHistory(readings.map((reading) => ({
-        time: new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
-        temperature: reading.temperature_c,
-        humidity: reading.humidity_percent,
-      })).reverse())
+      const readings = await readingService.list('manual')
+      setHistory(readings)
     } catch (error) {
-      setMessage(`Reading was saved, but the latest data could not be refreshed. ${error.response?.data?.detail || 'Check the service connection.'}`)
+      setMessage(`Reading was saved, but the list could not be refreshed. ${error.response?.data?.detail || 'Check the service connection.'}`)
+    }
+    try {
+      setSilos(await siloService.list('manual'))
+    } catch (error) {
+      setMessage(`Reading was saved, but summary values could not be refreshed. ${error.response?.data?.detail || 'Check the service connection.'}`)
     }
   }
 
@@ -297,7 +291,6 @@ export function ContentPage({ page }) {
     ? silos
     : []
   const pageHistory = loadedDataSource === dataSource ? history : []
-  const pageChartInterval = chartTickInterval(pageHistory.length)
   const averageOf = (field, digits = 1) => {
     const values = pageSilos.map((silo) => silo.latest_reading?.[field]).filter(Number.isFinite)
     return values.length ? `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(digits)}${field === 'temperature_c' ? '°C' : '%'}` : '—'
@@ -309,7 +302,7 @@ export function ContentPage({ page }) {
   const reportPageSize = 10
   const reportPageCount = Math.max(1, Math.ceil(reportReadings.length / reportPageSize))
   const visibleReportReadings = reportReadings.slice((reportPage - 1) * reportPageSize, reportPage * reportPageSize)
-  const reportCharts = buildReportCharts(reportReadings, reportSilos)
+  const reportCharts = buildReportCharts(reportReadings, [])
 
   const exportReportCsv = () => {
     const headers = ['Date', 'Time', 'Silo', 'Temperature (°C)', 'Air Humidity (%)', 'Grain Moisture (%)', 'Data Source', 'Status']
@@ -353,11 +346,6 @@ export function ContentPage({ page }) {
           {page === 'silos' && isAdministrator && <button className="button button-primary" onClick={() => setShowForm((value) => !value)}><Plus size={17} /> Register silo</button>}
           {page === 'users' && <button className="button button-primary" onClick={() => setShowUserForm((value) => !value)}><UserPlus size={16} /> Add user record</button>}
           {page === 'reports' && <>
-            {isAdministrator && <label className="report-control">Silo
-              <select aria-label="Filter reports by silo" value={reportSiloId} onChange={(event) => { setReportPage(1); setReportSiloId(event.target.value) }}>
-                {reportSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}
-              </select>
-            </label>}
             <label className="report-control">Date range
               <select aria-label="Report date range" value={reportPeriod} onChange={(event) => { setReportPage(1); setReportPeriod(event.target.value) }}>
                 <option value="24h">Last 24 Hours</option>
@@ -392,34 +380,26 @@ export function ContentPage({ page }) {
 
       {page === 'monitoring' && <>
         <div className="metric-grid compact-metrics">{[['Temperature', averageOf('temperature_c'), 'Air temperature'], ['Air humidity', averageOf('humidity_percent'), 'Relative humidity'], ['Grain moisture', averageOf('grain_moisture_percent'), 'Moisture content']].map(([label, value, note]) => <article className="metric-card" key={label}><div className="metric-top">{label}<span className="metric-icon green"><Activity size={18} /></span></div><div className="metric-value">{value}</div><DataSourceBadge source={dataSource} /><div className="metric-bottom">{note}</div></article>)}</div>
-        <section className="panel trend-panel content-panel">
-          <div className="panel-heading"><div><h2>Temperature & humidity history</h2><p>{dataSource === 'simulation' ? 'Generated sample readings' : `${sourceNames[dataSource]} readings`}</p>{dataSource === 'simulation' && <p className="chart-mode-note">Data is simulated for demonstration. Averages are shown hourly.</p>}</div><span className="chart-axis-caption">Left: °C · Right: %</span></div>
-          <div className="large-chart chart-watermark-wrap">
-            <span className="chart-watermark">{sourceWatermarks[dataSource]}</span>
-            {!pageHistory.length && <span className="chart-empty" role="status">{loadedDataSource !== dataSource ? 'Loading readings from the monitoring service…' : loadError ? 'Readings could not be loaded. Check the service connection and try again.' : dataSource === 'hardware' ? 'No sensor readings have been received. Configure a supported device to view live data.' : dataSource === 'simulation' ? 'No simulated readings are available for the selected silos.' : 'No manual readings are available. Add a reading to view it here.'}</span>}
-            <ResponsiveContainer width="100%" height="100%">
-              {dataSource === 'manual' ? (
-                <ScatterChart data={pageHistory}>
-                  <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" type="category" tickLine={false} axisLine={false} interval={pageChartInterval} minTickGap={30} />
-                  <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} />
-                  <Tooltip />
-                  <Scatter yAxisId="temperature" dataKey="temperature" name="Temperature °C" fill="#28814d" />
-                  <Scatter yAxisId="humidity" dataKey="humidity" name="Humidity %" fill="#76a4ce" />
-                </ScatterChart>
-              ) : (
-                <LineChart data={pageHistory}>
-                  <CartesianGrid stroke="#edf1ed" vertical={false} />
-                  <XAxis dataKey="time" tickLine={false} axisLine={false} interval={pageChartInterval} minTickGap={30} />
-                  <YAxis yAxisId="temperature" orientation="left" domain={['auto', 'auto']} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tickLine={false} axisLine={false} />
-                  <Tooltip />
-                  <Line yAxisId="temperature" type="monotone" dataKey="temperature" name="Temperature °C" stroke="#28814d" strokeDasharray={dataSource === 'simulation' ? '5 4' : undefined} dot={false} isAnimationActive={false} />
-                  <Line yAxisId="humidity" type="monotone" dataKey="humidity" name="Humidity %" stroke="#76a4ce" strokeDasharray={dataSource === 'simulation' ? '5 4' : undefined} dot={false} isAnimationActive={false} />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
+        <section className="panel content-panel">
+          <div className="panel-heading"><div><h2>Recent readings</h2><p>{dataSource === 'manual' ? 'Manual entries saved for your silo.' : `Latest ${sourceNames[dataSource] || dataSource} readings.`}</p></div></div>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th></tr></thead>
+              <tbody>
+                {pageHistory.slice(0, 10).map((reading) => (
+                  <tr key={reading.id}>
+                    <td>{new Date(reading.recorded_at).toLocaleDateString('en-MW', { timeZone: 'Africa/Blantyre' })}</td>
+                    <td>{new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' })}</td>
+                    <td>{pageSilos.find((silo) => silo.id === reading.silo_id)?.name || 'Local Silo'}</td>
+                    <td>{reading.temperature_c}°C</td>
+                    <td>{reading.humidity_percent}%</td>
+                    <td>{reading.grain_moisture_percent == null ? '—' : `${reading.grain_moisture_percent}%`}</td>
+                    <td><span className={`source-badge ${reading.data_source}`}>{sourceNames[reading.data_source] || reading.data_source}</span></td>
+                  </tr>
+                ))}
+                {!pageHistory.length && <tr><td className="empty-table" colSpan="7">{loadedDataSource !== dataSource ? 'Loading readings…' : loadError ? 'Readings could not be loaded. Check your connection and try again.' : 'No readings have been saved for this mode yet.'}</td></tr>}
+              </tbody>
+            </table>
           </div>
         </section>
         <section className="panel content-panel">
@@ -453,7 +433,7 @@ export function ContentPage({ page }) {
 
       {page === 'alerts' && (
         <section className="panel content-panel">
-          <div className="panel-heading"><div><h2>All alerts</h2><p>{alerts.length} alerts from your assigned silos</p></div></div>
+          <div className="panel-heading"><div><h2>Alerts</h2><p>Acknowledge an alert, inspect the silo, then resolve it when the issue is addressed.</p></div></div>
           <div className="alert-filter-tabs" role="tablist" aria-label="Filter alerts">
             {[['active', 'Active'], ['resolved', 'Resolved'], ['all', 'All']].map(([value, label]) => (
               <button
@@ -474,11 +454,13 @@ export function ContentPage({ page }) {
               <span className={`alert-symbol ${alert.severity}`}>{alert.severity === 'critical' ? '!' : alert.severity === 'warning' ? '↑' : 'i'}</span>
               <div>
                 <div className="alert-title"><strong>{alert.silo_name || `Silo ${alert.silo_id}`}</strong><StatusBadge status={alert.severity} />{alert.acknowledged && <span className="acknowledged-tag">Acknowledged</span>}{alert.resolved && <span className="resolved-label">Resolved</span>}</div>
-                <p>{alert.message}</p><small>{formatAlertDate(alert.created_at)}</small>
+                <p>{alert.message}</p>
+                <small>{formatAlertDate(alert.created_at)}</small>
+                {alert.acknowledged && !alert.resolved && <small className="alert-next-step">Acknowledged · inspect the silo before resolving</small>}
               </div>
               <div className="full-alert-actions">
-                {!alert.resolved && !alert.acknowledged && <button className="button button-primary" onClick={() => acknowledge(alert.id)}><Check size={14} /> Acknowledge</button>}
-                {!alert.resolved && alert.acknowledged && <button className="button button-primary" onClick={() => resolveAlert(alert.id)}>Resolve</button>}
+                {!alert.resolved && !alert.acknowledged && <button className="button button-primary" onClick={() => acknowledge(alert.id)}><Check size={14} /> Acknowledge alert</button>}
+                {!alert.resolved && alert.acknowledged && <button className="button button-primary" onClick={() => resolveAlert(alert.id)}>Resolve alert</button>}
               </div>
             </article>
           ))}</div>

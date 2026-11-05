@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Activity, Bell, Boxes, ChartNoAxesCombined, LayoutDashboard, Menu, Settings, Sprout, Users, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -21,10 +21,12 @@ export function AppLayout() {
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
+  const [alertToast, setAlertToast] = useState('')
   const [notificationError, setNotificationError] = useState('')
   const [notificationLoading, setNotificationLoading] = useState(true)
   const { user, logout } = useAuth()
   const userId = user?.id
+  const previousNotificationIds = useRef(null)
   const activeNotifications = notifications.filter((item) => !item.acknowledged && !item.resolved)
   const activeAlertCount = notifications.filter((item) => !item.resolved).length
   const userInitials = (user?.full_name || 'User')
@@ -42,6 +44,12 @@ export function AppLayout() {
       try {
         const items = await alertService.list()
         if (active) {
+          const knownIds = previousNotificationIds.current
+          const newAlert = knownIds && items.find((item) => !knownIds.has(item.id) && !item.acknowledged && !item.resolved)
+          if (newAlert) {
+            setAlertToast(`${newAlert.silo_name || 'Silo alert'}: ${newAlert.message}`)
+          }
+          previousNotificationIds.current = new Set(items.map((item) => item.id))
           setNotifications(items)
           setNotificationError('')
         }
@@ -67,6 +75,12 @@ export function AppLayout() {
       window.removeEventListener('alerts:updated', refresh)
     }
   }, [userId])
+
+  useEffect(() => {
+    if (!alertToast) return undefined
+    const timer = window.setTimeout(() => setAlertToast(''), 6000)
+    return () => window.clearTimeout(timer)
+  }, [alertToast])
 
   useEffect(() => {
     if (!logoutPromptOpen) return undefined
@@ -105,6 +119,7 @@ export function AppLayout() {
           </div>
           <button type="button" className="profile-button profile-initials" aria-label={`Account options for ${user?.full_name || 'your account'}`} title={`Account options for ${user?.full_name || 'your account'}`} onClick={() => setLogoutPromptOpen(true)}>{userInitials}</button>
         </div></header>
+        {alertToast && <div className="toast-notice alert-toast" role="alert">{alertToast}</div>}
         <div className="page-content"><Outlet /></div>
       </main>
       {logoutPromptOpen && <div className="dialog-backdrop"><section className="confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="logout-dialog-title" aria-describedby="logout-dialog-description"><h2 id="logout-dialog-title">Sign out?</h2><p id="logout-dialog-description">Are you sure you want to sign out of your account?</p><div className="dialog-actions"><button type="button" className="button button-secondary" autoFocus onClick={() => setLogoutPromptOpen(false)}>Stay signed in</button><button type="button" className="button button-primary" onClick={logout}>Sign out</button></div></section></div>}
