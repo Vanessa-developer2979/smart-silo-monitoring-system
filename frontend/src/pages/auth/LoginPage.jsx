@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, UserPlus } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react'
 import api from '../../services/api.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import '../../auth.css'
@@ -17,6 +17,8 @@ function getErrorMessage(error, fallback) {
 
 export function LoginPage() {
   const [createAccount, setCreateAccount] = useState(false)
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [showAccountPassword, setShowAccountPassword] = useState(false)
   const [credentials, setCredentials] = useState({ email: '', password: '' })
   const [account, setAccount] = useState({ full_name: '', email: '', password: '' })
   const [message, setMessage] = useState('')
@@ -61,7 +63,7 @@ export function LoginPage() {
       <section className="login-card">
         <span className="eyebrow">MALAWI GRAIN MONITORING</span>
         <h1>{createAccount ? 'Create Account' : 'Welcome'}</h1>
-        <p className="login-copy">{createAccount ? 'Create an operator account to access your silo dashboard.' : 'Log in to your Smart Silo Dashboard'}</p>
+        <p className="login-copy">{createAccount ? 'Create an operator account to access your silo dashboard.' : 'Log in to your Smart Silo'}</p>
 
         {message && <div className="login-message" role="alert">{message}</div>}
 
@@ -72,7 +74,10 @@ export function LoginPage() {
             <label className="form-label" htmlFor="account-email">Email address</label>
             <input id="account-email" type="email" autoComplete="email" required value={account.email} onChange={(event) => setAccount({ ...account, email: event.target.value })} placeholder="operator@smartsilo.mw" />
             <label className="form-label" htmlFor="account-password">Password</label>
-            <input id="account-password" type="password" autoComplete="new-password" required minLength="8" maxLength="128" value={account.password} onChange={(event) => setAccount({ ...account, password: event.target.value })} placeholder="At least 8 characters" />
+            <div className="password-input-wrap">
+              <input id="account-password" type={showAccountPassword ? 'text' : 'password'} autoComplete="new-password" required minLength="8" maxLength="128" value={account.password} onChange={(event) => setAccount({ ...account, password: event.target.value })} placeholder="At least 8 characters" />
+              <button className="password-visibility-toggle" type="button" aria-label={showAccountPassword ? 'Hide password' : 'Show password'} aria-controls="account-password" aria-pressed={showAccountPassword} onClick={() => setShowAccountPassword((visible) => !visible)}>{showAccountPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+            </div>
             <button className="button button-primary login-button" disabled={busy}>{busy ? 'Creating account…' : 'Create Account'} <UserPlus size={17} /></button>
           </form>
         ) : (
@@ -80,7 +85,10 @@ export function LoginPage() {
             <label className="form-label" htmlFor="login-email">Email address</label>
             <input id="login-email" type="email" autoComplete="username" required value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} placeholder="operator@smartsilo.mw" />
             <label className="form-label" htmlFor="login-password">Password</label>
-            <input id="login-password" type="password" autoComplete="current-password" required value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="Enter your password" />
+            <div className="password-input-wrap">
+              <input id="login-password" type={showLoginPassword ? 'text' : 'password'} autoComplete="current-password" required value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="Enter your password" />
+              <button className="password-visibility-toggle" type="button" aria-label={showLoginPassword ? 'Hide password' : 'Show password'} aria-controls="login-password" aria-pressed={showLoginPassword} onClick={() => setShowLoginPassword((visible) => !visible)}>{showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+            </div>
             <button className="button button-primary login-button" disabled={busy}>{busy ? 'Signing in…' : 'Log In'} <ArrowRight size={17} /></button>
           </form>
         )}

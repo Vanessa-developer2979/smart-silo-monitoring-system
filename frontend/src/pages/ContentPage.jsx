@@ -12,7 +12,7 @@ import './reports.css'
 
 const pageCopy = {
   silos: ['Local silo management', 'Manage details and capacity for the Local Silo.', 'Silos'],
-  monitoring: ['Live monitoring', 'Track temperature and humidity across your storage network.', 'Monitoring'],
+  monitoring: ['Live monitoring', 'Monitor the latest readings from your Local Silo.', 'Monitoring'],
   alerts: ['Alerts & events', 'Review conditions that may need your attention.', 'Alerts'],
   reports: ['Monitoring reports', 'Review and export trends from your silo network.', 'Reports'],
   users: ['User management', 'Manage workspace access and silo operator assignments.', 'Users'],
@@ -92,7 +92,6 @@ export function ContentPage({ page }) {
   const [reportPage, setReportPage] = useState(1)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
-  const [loadError, setLoadError] = useState('')
   const [message, setMessage] = useState('')
   const [successToast, setSuccessToast] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -143,27 +142,29 @@ export function ContentPage({ page }) {
     if (!request) return undefined
     request().then(() => {
       if (active) {
-        setLoadError('')
+        if (page === 'monitoring') setMessage('')
         setApiReady(true)
         setLoadedDataSource(dataSource)
       }
     }).catch((error) => {
       if (active) {
-      const detail = page === 'alerts'
-        ? 'Alerts are temporarily unavailable. Please check your connection and try again.'
-        : error.response?.data?.detail || 'The local API could not load this page. Check the connection and try again.'
-        setLoadError(detail)
         setApiReady(false)
         setLoadedDataSource(dataSource)
         setSilos([])
         setAlerts([])
         setHistory([])
         setInspections([])
+        if (page === 'monitoring') {
+          setMessage('')
+          return
+        }
+        const detail = page === 'alerts'
+          ? 'Alerts are temporarily unavailable. Please check your connection and try again.'
+          : error.response?.data?.detail || 'The local API could not load this page. Check the connection and try again.'
         if (page === 'reports') {
           setReadingLog([])
           setReportError(detail)
-        }
-        else setMessage(detail)
+        } else setMessage(detail)
       }
     })
     return () => { active = false }
@@ -299,6 +300,21 @@ export function ContentPage({ page }) {
     ? silos
     : []
   const pageHistory = loadedDataSource === dataSource ? history : []
+  const uniqueHistory = Array.from(new Map(
+    pageHistory
+      .filter((reading) => ['manual', 'simulation', 'hardware'].includes(reading.data_source))
+      .map((reading) => [
+        [
+          reading.silo_id,
+          reading.data_source,
+          reading.recorded_at,
+          reading.temperature_c,
+          reading.humidity_percent,
+          reading.grain_moisture_percent ?? '',
+        ].join('|'),
+        reading,
+      ]),
+  ).values())
   const averageOf = (field, digits = 1) => {
     const values = pageSilos.map((silo) => silo.latest_reading?.[field]).filter(Number.isFinite)
     return values.length ? `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(digits)}${field === 'temperature_c' ? '°C' : '%'}` : '—'
@@ -369,9 +385,7 @@ export function ContentPage({ page }) {
       {successToast && <div className="toast-notice" role="status">{successToast}</div>}
       {message && <div className="inline-notice" role="status">{message}</div>}
 
-      {page === 'monitoring' && dataSource === 'manual' && <section className="panel content-panel manual-entry-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Enter the values you measured. Saved readings are labeled Manual, not sensor data.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><label>Grain moisture (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.grain_moisture_percent} onChange={(event) => setReadingForm({ ...readingForm, grain_moisture_percent: event.target.value })} /></label><button className="button button-primary" disabled={!pageSilos.length}>Save manual reading</button></form>{!pageSilos.length && loadedDataSource === dataSource && <p className="page-footnote">No silos are assigned to your account. Ask an administrator to assign a silo before entering a reading.</p>}</section>}
-      {page === 'monitoring' && dataSource === 'hardware' && <section className="panel content-panel hardware-setup-panel"><div className="panel-heading"><div><h2>Connect sensor hardware</h2><p>Hardware mode displays device readings only after an integration is configured.</p></div></div><p>When you are ready, share the sensor or device model and how it can send readings (for example, Wi-Fi or a gateway). We can then configure a secure connection for temperature, humidity, and grain moisture. Do not share passwords or access tokens here.</p></section>}
-
+      {page === 'monitoring' && dataSource === 'manual' && <section className="panel content-panel manual-entry-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Enter the values you measured. Saved readings are labeled Manual, not sensor data.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><label>Grain moisture (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.grain_moisture_percent} onChange={(event) => setReadingForm({ ...readingForm, grain_moisture_percent: event.target.value })} /></label><button className="button button-primary" disabled={!pageSilos.length}>Save manual reading</button></form>{!pageSilos.length && apiReady && <p className="page-footnote">No silos are assigned to your account. Ask an administrator to assign a silo before entering a reading.</p>}</section>}
       {page === 'silos' && (
         <section className="panel silo-panel content-panel">
           <div className="panel-heading"><div><h2>Local Silo</h2><p>Storage details and current readings for your local site.</p></div></div>
@@ -389,13 +403,36 @@ export function ContentPage({ page }) {
       {page === 'monitoring' && <>
         <div className="metric-grid compact-metrics">{[['Temperature', averageOf('temperature_c'), 'Air temperature'], ['Air humidity', averageOf('humidity_percent'), 'Relative humidity'], ['Grain moisture', averageOf('grain_moisture_percent'), 'Moisture content']].map(([label, value, note]) => <article className="metric-card" key={label}><div className="metric-top">{label}<span className="metric-icon green"><Activity size={18} /></span></div><div className="metric-value">{value}</div><DataSourceBadge source={dataSource} /><div className="metric-bottom">{note}</div></article>)}</div>
         <section className="panel content-panel">
-          <div className="panel-heading"><div><h2>Recent readings</h2><p>{dataSource === 'manual' ? 'Manual entries saved for your silo.' : `Latest ${sourceNames[dataSource] || dataSource} readings.`}</p></div></div>
+          <div className="panel-heading"><div><h2>Active silo readings</h2><p>Latest {sourceNames[dataSource]?.toLowerCase() || 'selected-mode'} readings for each silo you can access.</p></div></div>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>SILO</th><th>LAST UPDATED</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th><th>STATUS</th></tr></thead>
+              <tbody>
+                {pageSilos.filter((silo) => silo.latest_reading).map((silo) => (
+                  <tr key={silo.id}>
+                    <td>{silo.name}</td>
+                    <td>{silo.latest_reading ? formatAlertDate(silo.latest_reading.recorded_at) : '—'}</td>
+                    <td>{silo.latest_reading ? `${silo.latest_reading.temperature_c}°C` : '—'}</td>
+                    <td>{silo.latest_reading ? `${silo.latest_reading.humidity_percent}%` : '—'}</td>
+                    <td>{silo.latest_reading?.grain_moisture_percent == null ? '—' : `${silo.latest_reading.grain_moisture_percent}%`}</td>
+                    <td>{silo.latest_reading && <span className={`source-badge ${silo.latest_reading.data_source}`}>{sourceNames[silo.latest_reading.data_source] || silo.latest_reading.data_source}</span>}</td>
+                    <td><StatusBadge status={silo.status || 'offline'} /></td>
+                  </tr>
+                ))}
+                {!pageSilos.length && <tr><td className="empty-table" colSpan="7">{loadedDataSource !== dataSource ? 'Loading readings…' : apiReady ? 'No silo is assigned to your account.' : 'Readings are unavailable right now.'}</td></tr>}
+                {pageSilos.length > 0 && !pageSilos.some((silo) => silo.latest_reading) && <tr><td className="empty-table" colSpan="7">No readings are available for this mode yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section className="panel content-panel">
+          <div className="panel-heading"><div><h2>Recent reading log</h2><p>Unique saved {dataSource === 'manual' ? 'manual' : dataSource === 'simulation' ? 'simulated' : 'hardware'} entries for the selected mode.</p></div><span className="status-badge info">{uniqueHistory.length} records</span></div>
           <div className="table-scroll">
             <table>
               <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th></tr></thead>
               <tbody>
-                {pageHistory.slice(0, 10).map((reading) => (
-                  <tr key={reading.id}>
+                {uniqueHistory.slice(0, 10).map((reading) => (
+                  <tr key={`${reading.silo_id}-${reading.data_source}-${reading.recorded_at}-${reading.temperature_c}-${reading.humidity_percent}-${reading.grain_moisture_percent ?? ''}`}>
                     <td>{new Date(reading.recorded_at).toLocaleDateString('en-MW', { timeZone: 'Africa/Blantyre' })}</td>
                     <td>{new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' })}</td>
                     <td>{pageSilos.find((silo) => silo.id === reading.silo_id)?.name || 'Local Silo'}</td>
@@ -405,7 +442,7 @@ export function ContentPage({ page }) {
                     <td><span className={`source-badge ${reading.data_source}`}>{sourceNames[reading.data_source] || reading.data_source}</span></td>
                   </tr>
                 ))}
-                {!pageHistory.length && <tr><td className="empty-table" colSpan="7">{loadedDataSource !== dataSource ? 'Loading readings…' : loadError ? 'Readings could not be loaded. Check your connection and try again.' : 'No readings have been saved for this mode yet.'}</td></tr>}
+                {!uniqueHistory.length && <tr><td className="empty-table" colSpan="7">{loadedDataSource !== dataSource ? 'Loading readings…' : 'No unique readings are available for this mode yet.'}</td></tr>}
               </tbody>
             </table>
           </div>
