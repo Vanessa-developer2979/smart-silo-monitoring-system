@@ -6,26 +6,11 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import Alert, SensorReading, Silo, User, utc_now
 
+LOCAL_SILO_NAME = "Local Silo"
+
 DEMO_SILOS = (
-    ("Kanengo", "Lilongwe District", "Maize", 1200, 78, 20.4, 56, 13.2),
-    ("Mzuzu (Msonda)", "Mzuzu District", "Maize", 950, 62, 21.1, 58, 13.5),
-    ("Luchenza", "Thyolo District", "Maize", 1100, 74, 22.0, 61, 13.8),
-    ("Blantyre", "Blantyre District", "Groundnuts", 1400, 83, 23.2, 63, 12.9),
-    ("Salima", "Salima District", "Rice", 1000, 68, 24.0, 65, 14.1),
-    ("Dowa", "Dowa District", "Wheat", 1500, 91, 24.8, 68, 13.6),
+    (LOCAL_SILO_NAME, "Local Site", "Maize", 1200, 78, 20.4, 56, 13.2),
 )
-
-LEGACY_SEED_NAMES = {
-    "Northfield 01": "Kanengo",
-    "Lilongwe Silo 01": "Kanengo",
-    "Northfield 02": "Mzuzu (Msonda)",
-    "Lilongwe Silo 02": "Mzuzu (Msonda)",
-    "Riverside 01": "Dowa",
-    "Dowa Silo 01": "Dowa",
-    "West Ridge 01": "Salima",
-    "Kasungu Silo 01": "Salima",
-}
-
 
 def _add_demo_readings(db: Session, silo: Silo, values: tuple[float, float, float]) -> None:
     existing_count = db.scalar(
@@ -62,17 +47,6 @@ def _add_demo_readings(db: Session, silo: Silo, values: tuple[float, float, floa
 
 def seed_demo_data(db: Session) -> None:
     silos = db.scalars(select(Silo).order_by(Silo.id)).all()
-    used_names = {silo.name for silo in silos}
-    for silo in silos:
-        target_name = LEGACY_SEED_NAMES.get(silo.name)
-        if target_name:
-            choices = (target_name, *(name for name, *_ in DEMO_SILOS))
-            available_name = next((name for name in choices if name not in used_names), None)
-            if available_name:
-                used_names.remove(silo.name)
-                silo.name = available_name
-                used_names.add(available_name)
-
     silo_by_name = {silo.name: silo for silo in silos}
     for name, location, grain_type, capacity, fill, *_ in DEMO_SILOS:
         silo = silo_by_name.get(name)
@@ -110,7 +84,7 @@ def seed_demo_data(db: Session) -> None:
             user.assigned_silos.extend(silo_by_name[name] for name, *_ in DEMO_SILOS)
 
     if not db.scalar(select(Alert.id).limit(1)):
-        silo_by_name["Dowa"].alerts.append(
+        silo_by_name[LOCAL_SILO_NAME].alerts.append(
             Alert(severity="warning", message="Simulated humidity is approaching the recommended limit (68%).")
         )
     db.commit()

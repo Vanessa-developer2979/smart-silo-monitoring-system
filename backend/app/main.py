@@ -7,9 +7,9 @@ from sqlalchemy import inspect, select, text
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.routes import auth, inspections, monitoring, reports, silos, users
-from app.models import User
+from app.models import Silo, User
 from app.security import hash_password
-from app.services.seed import seed_demo_data
+from app.services.seed import LOCAL_SILO_NAME, seed_demo_data
 
 
 def migrate_additive_columns():
@@ -39,10 +39,38 @@ def migrate_additive_columns():
         )
 
 
+def migrate_to_local_silo():
+    migration_name = "retain-only-local-silo"
+    with SessionLocal() as db:
+        db.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS app_migrations ("
+                "name VARCHAR(120) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+            )
+        )
+        applied = db.scalar(
+            text("SELECT 1 FROM app_migrations WHERE name = :name"),
+            {"name": migration_name},
+        )
+        if applied:
+            return
+
+        silos = db.scalars(select(Silo).where(Silo.name != LOCAL_SILO_NAME)).all()
+        for silo in silos:
+            db.delete(silo)
+        db.execute(
+            text("INSERT INTO app_migrations (name) VALUES (:name)"),
+            {"name": migration_name},
+        )
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     migrate_additive_columns()
+    migrate_to_local_silo()
     with SessionLocal() as db:
         seed_demo_data(db)
         if bool(settings.initial_admin_email) != bool(settings.initial_admin_password):

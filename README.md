@@ -2,7 +2,7 @@
 
 A responsive React/Vite dashboard and FastAPI API for grain storage monitoring in Malawi. SQLite is used by default; `DATABASE_URL` can be changed to a supported SQLAlchemy PostgreSQL URL.
 
-Sensor readings created during initial setup are simulated demonstration data. No physical IoT integration is connected. The sample silo locations are Kanengo, Mzuzu (Msonda), Luchenza, Blantyre, Salima, and Dowa.
+Sensor readings created during initial setup are simulated demonstration data. No physical IoT integration is connected. The demo uses one silo named Local Silo.
 
 ## Requirements
 
@@ -50,17 +50,17 @@ Vite serves the frontend at `http://localhost:5173`. `VITE_API_URL` defaults to 
 
 The frontend is a Vite single-page app for Vercel; the FastAPI backend and PostgreSQL database are configured as a Render Blueprint in `render.yaml`.
 
-1. In Render, choose **New → Blueprint**, connect this GitHub repository, and deploy `render.yaml`. The demo deployment enables `DEMO_MODE_ENABLED` so operator accounts can view the generated sample silos and readings. The blueprint prompts for `CORS_ORIGINS`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD`. For the first deployment, set `CORS_ORIGINS` to `http://localhost:5173`; after Vercel provides a URL, update it to that origin (for example, `https://your-project.vercel.app`). Use a private, unique admin password.
+1. In Render, choose **New → Blueprint**, connect this GitHub repository, and deploy `render.yaml`. The demo deployment enables `DEMO_MODE_ENABLED` so operator accounts can view the generated Local Silo and readings. The first backend startup after this update permanently removes every other silo and its readings, alerts, inspections, and operator assignments. The blueprint prompts for `CORS_ORIGINS`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD`. For the first deployment, set `CORS_ORIGINS` to `http://localhost:5173`; after Vercel provides a URL, update it to that origin (for example, `https://your-project.vercel.app`). Use a private, unique admin password.
 2. In Vercel, import this GitHub repository and set **Root Directory** to `frontend`. Use the default Vite build command (`npm run build`) and output directory (`dist`). Set the `VITE_API_URL` environment variable to `https://<your-render-service>.onrender.com/api`, then deploy.
 3. Update Render's `CORS_ORIGINS` to the exact Vercel production origin and redeploy/restart the API. If you use Vercel preview deployments, add their origins too.
 
-The Render Blueprint uses free plans to make a no-cost demo possible. In this demo configuration, unassigned operator accounts can access the six generated sample silos; set `DEMO_MODE_ENABLED=false` before using real silo data. Render's free web service can sleep while idle, and its free PostgreSQL database expires after 30 days; do not use this configuration for production or durable data. Upgrade the Render database and API to plans that meet your availability and storage needs before relying on them.
+The Render Blueprint uses free plans to make a no-cost demo possible. In this demo configuration, unassigned operator accounts can access the generated Local Silo; set `DEMO_MODE_ENABLED=false` before using real silo data. Render's free web service can sleep while idle, and its free PostgreSQL database expires after 30 days; do not use this configuration for production or durable data. Upgrade the Render database and API to plans that meet your availability and storage needs before relying on them.
 
 ## Authentication and roles
 
 - Login uses backend-verified credentials and returns a short-lived JWT. The browser keeps it in `sessionStorage` for the current tab session.
 - Public account creation always creates an operator account; users cannot grant themselves administrator access.
-- When `DEMO_MODE_ENABLED=true`, unassigned operator accounts are given access to the six simulated demonstration silos. This is for demonstrations only; set it to `false` when using real silo data.
+- When `DEMO_MODE_ENABLED=true`, unassigned operator accounts are given access to the simulated Local Silo. This is for demonstrations only; set it to `false` when using real silo data.
 - Administrator accounts are provisioned through the backend environment or by an existing administrator. The login page does not display shared test credentials or offer demo/role-preview access.
 - Operators only see data for silos assigned to their account. User management and settings routes require an administrator; protected API routes enforce authentication and administrative permissions as well.
 - Sample users from the original demo database have no passwords and are inactive. Provision an administrator or create a new operator account; do not rely on the sample names as login accounts.
@@ -82,4 +82,4 @@ Reports accept `period=24h`, `7d`, or `30d`, an optional `silo_id`, and a `data_
 
 ## Reports and demonstration data
 
-The Reports page reads its chart, KPI cards, filters, and paginated log from the authenticated reports API. It supports 24-hour, 7-day, and 30-day ranges, silo filtering, and CSV export. Initial demo data provides 30 days of hourly simulated readings for the six listed Malawi silos. The UI labels simulation data; these values are not hardware measurements.
+The Reports page reads its chart, KPI cards, filters, and paginated log from the authenticated reports API. It supports 24-hour, 7-day, and 30-day ranges, silo filtering, and CSV export. Initial demo data provides 30 days of hourly simulated readings for Local Silo. The UI labels simulation data; these values are not hardware measurements.
