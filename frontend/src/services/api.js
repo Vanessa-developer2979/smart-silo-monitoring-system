@@ -22,7 +22,7 @@ api.interceptors.response.use(
   },
 )
 
-export async function fetchDashboard(dataSource = 'simulation') {
+export async function fetchDashboard(dataSource = 'manual') {
   const [silos, alerts] = await Promise.all([
     api.get('/silos/', { params: { data_source: dataSource } }),
     api.get('/alerts/'),
@@ -34,7 +34,7 @@ export async function fetchDashboard(dataSource = 'simulation') {
 }
 
 export const siloService = {
-  list: (dataSource = 'simulation') => api.get('/silos/', { params: { data_source: dataSource } }).then(({ data }) => data),
+  list: (dataSource) => api.get('/silos/', { params: { data_source: dataSource } }).then(({ data }) => data),
   create: (payload) => api.post('/silos/', payload).then(({ data }) => data),
 }
 
@@ -51,6 +51,7 @@ export function notifyAlertsUpdated() {
 export const readingService = {
   create: (payload) => api.post('/readings/', payload).then(({ data }) => data),
   list: (dataSource) => api.get('/readings/', { params: { data_source: dataSource, limit: 1000 } }).then(({ data }) => data),
+  delete: (id) => api.delete(`/readings/${id}`),
 }
 
 export const inspectionService = {

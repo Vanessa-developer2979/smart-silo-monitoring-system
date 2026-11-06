@@ -66,15 +66,20 @@ class SiloUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class ReadingCreate(BaseModel):
+class ReadingValues(BaseModel):
     silo_id: int = Field(gt=0)
     temperature_c: float = Field(ge=-80, le=120)
     humidity_percent: float = Field(ge=0, le=100)
     grain_moisture_percent: float | None = Field(default=None, ge=0, le=100)
     recorded_at: datetime | None = None
-    data_source: Literal["simulation", "hardware", "manual"] = "simulation"
-    is_simulated: bool | None = None
-    source: str = Field(default="unspecified", max_length=80)
+
+
+class ReadingCreate(ReadingValues):
+    data_source: Literal["manual"] = "manual"
+
+
+class HardwareReadingCreate(ReadingValues):
+    pass
 
 
 class ReadingRead(ORMModel):
@@ -85,7 +90,7 @@ class ReadingRead(ORMModel):
     grain_moisture_percent: float | None
     recorded_at: datetime
     is_simulated: bool
-    data_source: Literal["simulation", "hardware", "manual"]
+    data_source: Literal["hardware", "manual"]
     source: str
 
 

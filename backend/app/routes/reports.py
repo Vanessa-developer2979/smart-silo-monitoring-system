@@ -11,7 +11,7 @@ from app.models import Alert, SensorReading, Silo, User
 
 router = APIRouter(prefix="/reports", tags=["reports"], dependencies=[Depends(get_current_user)])
 ReportRange = Literal["24h", "7d", "30d"]
-DataSource = Literal["simulation", "hardware", "manual"]
+DataSource = Literal["hardware", "manual"]
 
 
 @router.get("/history")
@@ -28,6 +28,7 @@ def report_history(
         select(SensorReading, Silo)
         .join(Silo, SensorReading.silo_id == Silo.id)
         .where(SensorReading.recorded_at >= cutoff)
+        .where(SensorReading.data_source.in_(("hardware", "manual")))
         .order_by(SensorReading.recorded_at.desc(), SensorReading.id.desc())
         .limit(5000)
     )
@@ -106,16 +107,8 @@ def report_summary(
         Alert.silo_id.in_(silo_scope),
         Alert.created_at >= cutoff,
     )
-    if data_source == "simulation":
-        alert_count_query = alert_count_query.where(
-            Alert.silo_id.in_(
-                select(SensorReading.silo_id)
-                .where(SensorReading.data_source == "simulation", SensorReading.recorded_at >= cutoff)
-                .distinct()
-            )
-        )
     history.update(
         alert_count=db.scalar(alert_count_query) or 0,
-        data_notice="Demonstration readings are simulated and are not from physical sensor hardware.",
+        data_notice="Readings are sourced from ESP32 hardware or authorized manual entry.",
     )
     return history

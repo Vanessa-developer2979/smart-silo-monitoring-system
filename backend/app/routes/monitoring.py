@@ -1,26 +1,30 @@
+import hmac
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models import Alert, SensorReading, Silo, User
-from app.schemas import AlertCreate, AlertRead, ReadingCreate, ReadingRead
+from app.schemas import AlertCreate, AlertRead, HardwareReadingCreate, ReadingCreate, ReadingRead, ReadingValues
 
 router = APIRouter(tags=["monitoring"], dependencies=[Depends(get_current_user)])
+hardware_router = APIRouter(tags=["monitoring"])
 
 
 @router.get("/readings/", response_model=list[ReadingRead])
 def list_readings(
     silo_id: int | None = Query(default=None, gt=0),
-    data_source: Literal["simulation", "hardware", "manual"] | None = None,
+    data_source: Literal["hardware", "manual"] | None = None,
     limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     query = select(SensorReading).join(Silo).order_by(SensorReading.recorded_at.desc())
+    query = query.where(SensorReading.data_source.in_(("hardware", "manual")))
     if silo_id is not None:
         query = query.where(SensorReading.silo_id == silo_id)
     if current_user.role != "administrator":
@@ -32,7 +36,7 @@ def list_readings(
 
 @router.get("/readings/latest")
 def latest_readings(
-    data_source: Literal["simulation", "hardware", "manual"] | None = None,
+    data_source: Literal["hardware", "manual"] | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -43,7 +47,8 @@ def latest_readings(
             continue
         readings = [
             item for item in silo.readings
-            if data_source is None or item.data_source == data_source
+            if item.data_source in ("hardware", "manual")
+            and (data_source is None or item.data_source == data_source)
         ]
         reading = max(readings, key=lambda item: item.recorded_at, default=None)
         if reading:
@@ -51,17 +56,24 @@ def latest_readings(
     return result
 
 
-@router.post("/readings/", response_model=ReadingRead, status_code=status.HTTP_201_CREATED)
-def create_reading(payload: ReadingCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def save_reading(
+    payload: ReadingValues,
+    data_source: str,
+    source: str,
+    db: Session,
+    current_user: User | None = None,
+) -> SensorReading:
     silo = db.get(Silo, payload.silo_id)
     if silo is None:
         raise HTTPException(status_code=404, detail="Silo not found.")
-    if current_user.role != "administrator" and silo not in current_user.assigned_silos:
+    if current_user and current_user.role != "administrator" and silo not in current_user.assigned_silos:
         raise HTTPException(status_code=403, detail="This silo is not assigned to your account.")
-    reading_values = payload.model_dump(exclude={"recorded_at", "is_simulated"})
+    reading_values = payload.model_dump(exclude={"recorded_at", "data_source"})
     reading = SensorReading(
         **reading_values,
-        is_simulated=payload.data_source == "simulation",
+        is_simulated=False,
+        data_source=data_source,
+        source=source,
     )
     if payload.recorded_at:
         reading.recorded_at = payload.recorded_at
@@ -92,6 +104,46 @@ def create_reading(payload: ReadingCreate, db: Session = Depends(get_db), curren
     db.commit()
     db.refresh(reading)
     return reading
+
+
+@router.post("/readings/", response_model=ReadingRead, status_code=status.HTTP_201_CREATED)
+def create_reading(
+    payload: ReadingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return save_reading(payload, "manual", "manual-entry", db, current_user)
+
+
+@hardware_router.post("/readings/hardware", response_model=ReadingRead, status_code=status.HTTP_201_CREATED)
+def create_hardware_reading(
+    payload: HardwareReadingCreate,
+    x_device_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    if not settings.esp32_api_key:
+        raise HTTPException(status_code=503, detail="Hardware reading ingestion is not configured.")
+    if x_device_key is None or not hmac.compare_digest(x_device_key, settings.esp32_api_key):
+        raise HTTPException(status_code=401, detail="Invalid hardware device key.")
+    return save_reading(payload, "hardware", "ESP32", db)
+
+
+@router.delete("/readings/{reading_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reading(
+    reading_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    reading = db.get(SensorReading, reading_id)
+    if reading is None:
+        raise HTTPException(status_code=404, detail="Reading not found.")
+    if reading.data_source != "manual":
+        raise HTTPException(status_code=403, detail="Only manual readings can be deleted.")
+    if current_user.role != "administrator" and reading.silo not in current_user.assigned_silos:
+        raise HTTPException(status_code=403, detail="This reading is outside your assigned silos.")
+    db.delete(reading)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/alerts/")

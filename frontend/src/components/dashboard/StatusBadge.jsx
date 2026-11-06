@@ -1,4 +1,4 @@
 export function StatusBadge({ status }) {
-  const labels = { normal: 'Normal', warning: 'Warning', critical: 'Critical', info: 'Info', online: 'Online', offline: 'Offline', simulated: 'Simulated' }
+  const labels = { normal: 'Normal', warning: 'Warning', critical: 'Critical', info: 'Info', online: 'Online', offline: 'Offline' }
   return <span className={`status-badge ${status}`}>{labels[status] || status}</span>
 }

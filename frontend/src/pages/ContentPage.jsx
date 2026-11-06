@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
+import { DataModeSelector } from '../components/common/DataModeSelector.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
@@ -18,7 +18,7 @@ const pageCopy = {
   users: ['User management', 'Manage workspace access and silo operator assignments.', 'Users'],
   settings: ['Workspace settings', 'Configure thresholds and workspace preferences.', 'Settings'],
 }
-const sourceNames = { simulation: 'Simulated', hardware: 'Hardware', manual: 'Manual' }
+const sourceNames = { hardware: 'Hardware', manual: 'Manual' }
 
 function formatAlertDate(value) {
   const date = new Date(value)
@@ -121,13 +121,10 @@ export function ContentPage({ page }) {
         setReadingLog([])
         setReportError('')
         setReportLoading(true)
-        return Promise.all([
-          reportService.history({ period: reportPeriod, data_source: dataSource }),
-          reportService.history({ period: reportPeriod }),
-        ]).then(([data, allReadings]) => {
+        return reportService.history({ period: reportPeriod, data_source: dataSource }).then((data) => {
           if (active) {
             setReport(data)
-            setReadingLog(allReadings.readings)
+            setReadingLog(data.readings)
           }
         }).finally(() => {
           if (active) setReportLoading(false)
@@ -261,6 +258,22 @@ export function ContentPage({ page }) {
     }
   }
 
+  const deleteReading = async (reading) => {
+    if (!window.confirm('Delete this manual reading? This cannot be undone.')) return
+    try {
+      await readingService.delete(reading.id)
+      setHistory((items) => items.filter((item) => item.id !== reading.id))
+      setSuccessToast('Manual reading deleted.')
+      try {
+        setSilos(await siloService.list('manual'))
+      } catch (error) {
+        setMessage(`Reading was deleted, but summary values could not be refreshed. ${error.response?.data?.detail || 'Check the service connection.'}`)
+      }
+    } catch (error) {
+      setMessage(error.response?.data?.detail || 'Could not delete the manual reading.')
+    }
+  }
+
   const submitReading = async (event) => {
     event.preventDefault()
     setMessage('')
@@ -300,21 +313,7 @@ export function ContentPage({ page }) {
     ? silos
     : []
   const pageHistory = loadedDataSource === dataSource ? history : []
-  const uniqueHistory = Array.from(new Map(
-    pageHistory
-      .filter((reading) => ['manual', 'simulation', 'hardware'].includes(reading.data_source))
-      .map((reading) => [
-        [
-          reading.silo_id,
-          reading.data_source,
-          reading.recorded_at,
-          reading.temperature_c,
-          reading.humidity_percent,
-          reading.grain_moisture_percent ?? '',
-        ].join('|'),
-        reading,
-      ]),
-  ).values())
+  const visibleHistory = pageHistory.filter((reading) => reading.data_source === dataSource)
   const averageOf = (field, digits = 1) => {
     const values = pageSilos.map((silo) => silo.latest_reading?.[field]).filter(Number.isFinite)
     return values.length ? `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(digits)}${field === 'temperature_c' ? '°C' : '%'}` : '—'
@@ -381,11 +380,11 @@ export function ContentPage({ page }) {
           </>}
         </div>
       </div>
-      <SimulatedDataNotice />
+      <DataModeSelector />
       {successToast && <div className="toast-notice" role="status">{successToast}</div>}
       {message && <div className="inline-notice" role="status">{message}</div>}
 
-      {page === 'monitoring' && dataSource === 'manual' && <section className="panel content-panel manual-entry-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Enter the values you measured. Saved readings are labeled Manual, not sensor data.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><label>Grain moisture (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.grain_moisture_percent} onChange={(event) => setReadingForm({ ...readingForm, grain_moisture_percent: event.target.value })} /></label><button className="button button-primary" disabled={!pageSilos.length}>Save manual reading</button></form>{!pageSilos.length && apiReady && <p className="page-footnote">No silos are assigned to your account. Ask an administrator to assign a silo before entering a reading.</p>}</section>}
+      {page === 'monitoring' && dataSource === 'manual' && <section className="panel content-panel manual-entry-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Enter the values you measured. Saved readings are labeled Manual, not sensor data. You can delete an incorrect entry from the reading log.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><label>Grain moisture (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.grain_moisture_percent} onChange={(event) => setReadingForm({ ...readingForm, grain_moisture_percent: event.target.value })} /></label><button className="button button-primary" disabled={!pageSilos.length}>Save manual reading</button></form>{!pageSilos.length && apiReady && <p className="page-footnote">No silos are assigned to your account. Ask an administrator to assign a silo before entering a reading.</p>}</section>}
       {page === 'silos' && (
         <section className="panel silo-panel content-panel">
           <div className="panel-heading"><div><h2>Local Silo</h2><p>Storage details and current readings for your local site.</p></div></div>
@@ -426,13 +425,13 @@ export function ContentPage({ page }) {
           </div>
         </section>
         <section className="panel content-panel">
-          <div className="panel-heading"><div><h2>Recent reading log</h2><p>Unique saved {dataSource === 'manual' ? 'manual' : dataSource === 'simulation' ? 'simulated' : 'hardware'} entries for the selected mode.</p></div><span className="status-badge info">{uniqueHistory.length} records</span></div>
+          <div className="panel-heading"><div><h2>Recent reading log</h2><p>Saved {dataSource === 'manual' ? 'manual' : 'hardware'} entries for the selected mode.</p></div><span className="status-badge info">{visibleHistory.length} records</span></div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th></tr></thead>
+              <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th>{dataSource === 'manual' && <th><span className="visually-hidden">Actions</span></th>}</tr></thead>
               <tbody>
-                {uniqueHistory.slice(0, 10).map((reading) => (
-                  <tr key={`${reading.silo_id}-${reading.data_source}-${reading.recorded_at}-${reading.temperature_c}-${reading.humidity_percent}-${reading.grain_moisture_percent ?? ''}`}>
+                {visibleHistory.slice(0, 10).map((reading) => (
+                  <tr key={reading.id}>
                     <td>{new Date(reading.recorded_at).toLocaleDateString('en-MW', { timeZone: 'Africa/Blantyre' })}</td>
                     <td>{new Date(reading.recorded_at).toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' })}</td>
                     <td>{pageSilos.find((silo) => silo.id === reading.silo_id)?.name || 'Local Silo'}</td>
@@ -440,9 +439,10 @@ export function ContentPage({ page }) {
                     <td>{reading.humidity_percent}%</td>
                     <td>{reading.grain_moisture_percent == null ? '—' : `${reading.grain_moisture_percent}%`}</td>
                     <td><span className={`source-badge ${reading.data_source}`}>{sourceNames[reading.data_source] || reading.data_source}</span></td>
+                    {dataSource === 'manual' && <td><button type="button" className="icon-button inspection-delete-button" aria-label={`Delete manual reading for ${pageSilos.find((silo) => silo.id === reading.silo_id)?.name || `Silo ${reading.silo_id}`}`} title="Delete manual reading" onClick={() => deleteReading(reading)}><Trash2 size={16} /></button></td>}
                   </tr>
                 ))}
-                {!uniqueHistory.length && <tr><td className="empty-table" colSpan="7">{loadedDataSource !== dataSource ? 'Loading readings…' : 'No unique readings are available for this mode yet.'}</td></tr>}
+                {!visibleHistory.length && <tr><td className="empty-table" colSpan={dataSource === 'manual' ? 8 : 7}>{loadedDataSource !== dataSource ? 'Loading readings…' : 'No readings available'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -536,7 +536,7 @@ export function ContentPage({ page }) {
               <section className="panel content-panel report-chart-panel">
                 <div className="panel-heading">
                   <div><h2>Historical Storage Conditions</h2><p>{report.reading_count} {sourceNames[dataSource]?.toLowerCase() || dataSource} readings across {report.silo_count} silos · charts shown separately for each silo</p></div>
-                  <span className="status-badge info">{dataSource === 'simulation' ? 'Simulation Mode Active' : `${sourceNames[dataSource] || dataSource} mode selected`}</span>
+                  <span className="status-badge info">{`${sourceNames[dataSource] || dataSource} mode selected`}</span>
                 </div>
                 <div className="report-silo-charts">
                   {reportCharts.map((chart) => (
@@ -568,13 +568,12 @@ export function ContentPage({ page }) {
             ) : (
               <section className="panel content-panel report-empty-state">
                 <Warehouse size={28} />
-                <h2>No {sourceNames[dataSource]?.toLowerCase() || dataSource} chart data</h2>
-                <p>No readings in the selected mode and date range. The historical log below includes saved readings from every data source.</p>
-                {dataSource === 'simulation' && <span>Simulation readings are generated demonstration data, not physical sensor measurements.</span>}
+                <h2>No readings available</h2>
+                <p>No readings in the selected mode and date range. The historical log below shows only readings from the selected data source.</p>
               </section>
             )}
             <section className="panel content-panel report-table-panel">
-              <div className="panel-heading"><div><h2>Historical reading log</h2><p>Saved readings from all data sources in the selected date range</p></div><span className="status-badge info">{readingLog.length} records</span></div>
+              <div className="panel-heading"><div><h2>Historical reading log</h2><p>Saved {sourceNames[dataSource]?.toLowerCase() || dataSource} readings in the selected date range</p></div><span className="status-badge info">{readingLog.length} records</span></div>
               <div className="table-scroll">
                 <table>
                   <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>DATA SOURCE</th><th>STATUS</th></tr></thead>

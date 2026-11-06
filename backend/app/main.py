@@ -7,9 +7,8 @@ from sqlalchemy import inspect, select, text
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.routes import auth, inspections, monitoring, reports, silos, users
-from app.models import Silo, User
+from app.models import User
 from app.security import hash_password
-from app.services.seed import LOCAL_SILO_NAME, seed_demo_data
 
 
 def migrate_additive_columns():
@@ -39,26 +38,37 @@ def migrate_additive_columns():
         )
 
 
-def migrate_to_local_silo():
-    migration_name = "retain-only-local-silo"
-    with SessionLocal() as db:
-        db.execute(
+def provision_initial_admin():
+    if bool(settings.initial_admin_email) != bool(settings.initial_admin_password):
+        raise RuntimeError("Set both INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD to provision an administrator.")
+    if not settings.initial_admin_email:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
             text(
                 "CREATE TABLE IF NOT EXISTS app_migrations ("
                 "name VARCHAR(120) PRIMARY KEY, "
                 "applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
             )
         )
-        applied = db.scalar(
+
+    migration_name = "initial-admin-provisioned"
+    with SessionLocal() as db:
+        if db.scalar(
             text("SELECT 1 FROM app_migrations WHERE name = :name"),
             {"name": migration_name},
-        )
-        if applied:
+        ):
             return
 
-        silos = db.scalars(select(Silo).where(Silo.name != LOCAL_SILO_NAME)).all()
-        for silo in silos:
-            db.delete(silo)
+        admin = db.scalar(select(User).where(User.email == settings.initial_admin_email))
+        if admin is None:
+            admin = User(email=settings.initial_admin_email)
+            db.add(admin)
+        admin.full_name = settings.initial_admin_name
+        admin.role = "administrator"
+        admin.is_active = True
+        admin.password_hash = hash_password(settings.initial_admin_password)
         db.execute(
             text("INSERT INTO app_migrations (name) VALUES (:name)"),
             {"name": migration_name},
@@ -70,22 +80,7 @@ def migrate_to_local_silo():
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     migrate_additive_columns()
-    migrate_to_local_silo()
-    with SessionLocal() as db:
-        seed_demo_data(db)
-        if bool(settings.initial_admin_email) != bool(settings.initial_admin_password):
-            raise RuntimeError("Set both INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD to provision an administrator.")
-        if settings.initial_admin_email:
-            admin = db.scalar(select(User).where(User.email == settings.initial_admin_email))
-            if admin is None:
-                admin = User(email=settings.initial_admin_email)
-                db.add(admin)
-            if admin.password_hash is None:
-                admin.full_name = settings.initial_admin_name
-                admin.role = "administrator"
-                admin.is_active = True
-                admin.password_hash = hash_password(settings.initial_admin_password)
-                db.commit()
+    provision_initial_admin()
     yield
 
 
@@ -106,6 +101,7 @@ app.add_middleware(
 
 for route_module in (auth, users, silos, monitoring, inspections, reports):
     app.include_router(route_module.router, prefix="/api")
+app.include_router(monitoring.hardware_router, prefix="/api")
 
 
 @app.get("/health", tags=["health"])

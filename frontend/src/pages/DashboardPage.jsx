@@ -3,7 +3,7 @@ import { Activity, ArrowRight, CircleAlert, Droplets, Plus, Thermometer, Warehou
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
-import { SimulatedDataNotice } from '../components/common/SimulatedDataNotice.jsx'
+import { DataModeSelector } from '../components/common/DataModeSelector.jsx'
 import { useDashboardData } from '../hooks/useDashboardData.js'
 import { useAuth } from '../hooks/useAuth.js'
 
@@ -12,8 +12,7 @@ const numberAverage = (items) => items.length
   : null
 
 const sourceLabel = (source) => ({
-  simulation: 'Simulated',
-  hardware: 'Sensor',
+  hardware: 'Hardware',
   manual: 'Manual',
 }[source] || 'Unknown')
 
@@ -60,7 +59,7 @@ export function DashboardPage({ operatorMode = false }) {
     <>
       <div className="welcome-row">
         <div>
-          <div className="eyebrow">{currentDate.toUpperCase()} <span className="live-tag"><i /> {dataSource === 'hardware' ? 'HARDWARE MODE' : dataSource === 'manual' ? 'MANUAL MODE' : 'SIMULATION'}</span></div>
+          <div className="eyebrow">{currentDate.toUpperCase()} <span className="live-tag"><i /> {dataSource === 'hardware' ? 'HARDWARE MODE' : 'MANUAL MODE'}</span></div>
           <h1>{operatorMode ? 'Silo monitoring' : `Storage operations${user?.full_name ? ` · ${user.full_name.split(' ')[0]}` : ''}`}</h1>
           <p>{operatorMode ? 'Monitoring overview for your assigned silos.' : 'An overview of storage conditions and active alerts.'}</p>
         </div>
@@ -69,7 +68,7 @@ export function DashboardPage({ operatorMode = false }) {
           {!operatorMode && <a className="button button-primary" href="/silos"><Plus size={17} /> Add silo</a>}
         </div>
       </div>
-      <SimulatedDataNotice />
+      <DataModeSelector />
       {actionToast && <div className="toast-notice" role="status">{actionToast}</div>}
       {actionError && <div className="inline-notice" role="alert">{actionError}</div>}
 
@@ -110,14 +109,14 @@ export function DashboardPage({ operatorMode = false }) {
             return <tr key={silo.id}>
               <td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td>
               <td>{silo.grain_type}</td>
-              <td><TemperatureReading value={silo.temperature} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /></td>
+              <td>{Number.isFinite(silo.temperature) ? <TemperatureReading value={silo.temperature} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /> : 'No readings available'}</td>
               <td>{Number.isFinite(silo.humidity) ? `${silo.humidity}%` : '—'}</td>
-              <td><div className="moisture-cell"><span>{Number.isFinite(moisture) ? `${moisture}%` : '—'}</span>{Number.isFinite(moisture) && <span className={`source-badge ${silo.data_source || 'simulation'}`}>{sourceLabel(silo.data_source)}</span>}</div></td>
+              <td><div className="moisture-cell"><span>{Number.isFinite(moisture) ? `${moisture}%` : '—'}</span>{silo.data_source && <span className={`source-badge ${silo.data_source}`}>{sourceLabel(silo.data_source)}</span>}</div></td>
               <td><div className={`capacity-cell${fill > 90 ? ' capacity-high' : ''}`}><div className="capacity-track"><i style={{ width: `${fill}%` }} /></div><small>{fill}%</small></div></td>
               <td><StatusBadge status={silo.connection_status || 'offline'} /></td>
             </tr>
           })}
-          {!visibleSilos.length && <tr><td colSpan="7" className="empty-table">No silo readings are available for this data mode.</td></tr>}
+          {!visibleSilos.length && <tr><td colSpan="7" className="empty-table">No readings available</td></tr>}
         </tbody></table></div>
       </section>
     </>

@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -5,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
-from datetime import datetime, timezone
 
 from app.models import Silo, User
 from app.schemas import AssignmentCreate, SiloCreate, SiloUpdate
@@ -13,10 +15,11 @@ from app.schemas import AssignmentCreate, SiloCreate, SiloUpdate
 router = APIRouter(tags=["silos and assignments"], dependencies=[Depends(get_current_user)])
 
 
-def silo_payload(silo: Silo, data_source: str | None = None) -> dict:
+def silo_payload(silo: Silo, data_source: Literal["hardware", "manual"] | None = None) -> dict:
     readings = [
         reading for reading in silo.readings
-        if data_source is None or reading.data_source == data_source
+        if reading.data_source in ("hardware", "manual")
+        and (data_source is None or reading.data_source == data_source)
     ]
     latest = max(readings, key=lambda reading: reading.recorded_at, default=None)
     status_value = "normal"
@@ -35,9 +38,7 @@ def silo_payload(silo: Silo, data_source: str | None = None) -> dict:
     if recorded_at and recorded_at.tzinfo is None:
         recorded_at = recorded_at.replace(tzinfo=timezone.utc)
     is_fresh = recorded_at is not None and (now - recorded_at).total_seconds() <= 15 * 60
-    if latest and latest.data_source == "simulation":
-        connection_status = "simulated"
-    elif latest and latest.data_source == "hardware" and is_fresh:
+    if latest and latest.data_source == "hardware" and is_fresh:
         connection_status = "online"
     else:
         connection_status = "offline"
@@ -69,12 +70,10 @@ def silo_payload(silo: Silo, data_source: str | None = None) -> dict:
 
 @router.get("/silos/")
 def list_silos(
-    data_source: str | None = None,
+    data_source: Literal["hardware", "manual"] | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if data_source not in (None, "simulation", "hardware", "manual"):
-        raise HTTPException(status_code=422, detail="data_source must be simulation, hardware, or manual.")
     silos = db.scalars(select(Silo).order_by(Silo.id)).all()
     if current_user.role != "administrator":
         assigned_ids = {silo.id for silo in current_user.assigned_silos}

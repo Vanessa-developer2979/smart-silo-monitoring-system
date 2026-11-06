@@ -1,7 +1,6 @@
 const sourceDetails = {
   manual: { label: 'Manual', className: 'manual' },
-  hardware: { label: 'Live Sensor', className: 'hardware' },
-  simulation: { label: 'Simulated', className: 'simulation' },
+  hardware: { label: 'Hardware', className: 'hardware' },
 }
 
 export function DataSourceBadge({ source }) {

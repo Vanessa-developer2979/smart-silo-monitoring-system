@@ -6,6 +6,12 @@ import { useAuth } from '../../hooks/useAuth.js'
 import '../../auth.css'
 
 function getErrorMessage(error, fallback) {
+  if (!error.response) {
+    return 'Could not reach the Smart Silo API. Check the backend service and VITE_API_URL.'
+  }
+  if (error.response.status >= 500) {
+    return 'The Smart Silo API could not complete the request. Check the backend service logs and try again.'
+  }
   const detail = error.response?.data?.detail
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) {

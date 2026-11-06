@@ -71,7 +71,7 @@ class SensorReading(Base):
     grain_moisture_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=False)
-    data_source: Mapped[str] = mapped_column(String(20), default="simulation")
+    data_source: Mapped[str] = mapped_column(String(20), default="manual")
     source: Mapped[str] = mapped_column(String(80), default="unspecified")
     silo: Mapped[Silo] = relationship(back_populates="readings")
 
