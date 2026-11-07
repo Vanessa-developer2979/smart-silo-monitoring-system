@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Activity, ArrowRight, CircleAlert, Droplets, Plus, Thermometer, Warehouse } from 'lucide-react'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
@@ -17,7 +18,7 @@ const sourceLabel = (source) => ({
 }[source] || 'Unknown')
 
 export function DashboardPage({ operatorMode = false }) {
-  const { silos, alerts, actionError, acknowledge, resolve, dataSource } = useDashboardData()
+  const { silos, alerts, loading, loadError, actionError, acknowledge, resolve, dataSource } = useDashboardData()
   const { user } = useAuth()
   const isAdministrator = user?.role === 'administrator'
   const visibleSilos = silos
@@ -64,13 +65,15 @@ export function DashboardPage({ operatorMode = false }) {
           <p>{operatorMode ? 'Monitoring overview for your assigned silos.' : 'An overview of storage conditions and active alerts.'}</p>
         </div>
         <div className="welcome-actions">
-          {user?.role === 'administrator' && <a className="button button-secondary" href="/reports">View reports</a>}
-          {!operatorMode && <a className="button button-primary" href="/silos"><Plus size={17} /> Add silo</a>}
+          {user?.role === 'administrator' && <Link className="button button-secondary" to="/reports">View reports</Link>}
+          {!operatorMode && <Link className="button button-primary" to="/silos"><Plus size={17} /> Add silo</Link>}
         </div>
       </div>
       <DataModeSelector />
       {actionToast && <div className="toast-notice" role="status">{actionToast}</div>}
       {actionError && <div className="inline-notice" role="alert">{actionError}</div>}
+      {loadError && <div className="inline-notice" role="alert">{loadError}</div>}
+      {loading && !loadError && <div className="inline-notice" role="status">Loading data… the server may take up to a minute to wake after a period of inactivity.</div>}
 
       <section className="metric-grid">
         <MetricCard label="Avg. temperature" value={averageTemperature == null ? '—' : `${averageTemperature.toFixed(1)}°C`} note="Air temperature" icon={Thermometer} style="blue" dataSource={dataSource} />
@@ -80,7 +83,7 @@ export function DashboardPage({ operatorMode = false }) {
       </section>
 
       <section className="panel dashboard-alerts">
-        <div className="panel-heading"><div><h2>Active alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Conditions that need attention across your silos</p></div><a className="text-link" href="/alerts">View all alerts <ArrowRight size={14} /></a></div>
+        <div className="panel-heading"><div><h2>Active alerts <span className="heading-count">{activeAlerts.length}</span></h2><p>Conditions that need attention across your silos</p></div><Link className="text-link" to="/alerts">View all alerts <ArrowRight size={14} /></Link></div>
         <div className="alert-list">{activeAlerts.slice(0, 4).map((alert) => (
               <div className="alert-item" key={alert.id}>
                 <span className={`alert-symbol ${alert.severity}`}>{alert.severity === 'critical' ? '!' : alert.severity === 'warning' ? '↑' : 'i'}</span>
@@ -101,7 +104,7 @@ export function DashboardPage({ operatorMode = false }) {
       </section>
 
       <section className="panel silo-panel">
-        <div className="panel-heading"><div><h2>Local silo health</h2><p>Latest readings, fill level, and connection state</p></div><a className="text-link" href="/silos">Local silo details <ArrowRight size={14} /></a></div>
+        <div className="panel-heading"><div><h2>Local silo health</h2><p>Latest readings, fill level, and connection state</p></div><Link className="text-link" to="/silos">Local silo details <ArrowRight size={14} /></Link></div>
         <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>
           {visibleSilos.map((silo) => {
             const moisture = silo.grain_moisture_percent
@@ -116,7 +119,7 @@ export function DashboardPage({ operatorMode = false }) {
               <td><StatusBadge status={silo.connection_status || 'offline'} /></td>
             </tr>
           })}
-          {!visibleSilos.length && <tr><td colSpan="7" className="empty-table">No readings available</td></tr>}
+          {!visibleSilos.length && <tr><td colSpan="7" className="empty-table">{loading ? 'Loading…' : loadError ? 'Data unavailable' : 'No readings available'}</td></tr>}
         </tbody></table></div>
       </section>
     </>

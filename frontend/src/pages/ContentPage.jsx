@@ -113,9 +113,9 @@ export function ContentPage({ page }) {
   useEffect(() => {
     let active = true
     const request = {
-      silos: () => siloService.list(dataSource).then(setSilos),
-      alerts: () => alertService.list().then(setAlerts),
-      users: () => userService.list().then(setUsers),
+      silos: () => siloService.list(dataSource).then((data) => { if (active) setSilos(data) }),
+      alerts: () => alertService.list().then((data) => { if (active) setAlerts(data) }),
+      users: () => userService.list().then((data) => { if (active) setUsers(data) }),
       reports: () => {
         setReport(null)
         setReadingLog([])
@@ -131,9 +131,9 @@ export function ContentPage({ page }) {
         })
       },
       monitoring: () => Promise.all([
-        siloService.list(dataSource).then(setSilos),
-        inspectionService.list().then(setInspections),
-        readingService.list(dataSource).then(setHistory),
+        siloService.list(dataSource).then((data) => { if (active) setSilos(data) }),
+        inspectionService.list().then((data) => { if (active) setInspections(data) }),
+        readingService.list(dataSource).then((data) => { if (active) setHistory(data) }),
       ]),
     }[page]
     if (!request) return undefined
@@ -532,6 +532,7 @@ export function ContentPage({ page }) {
           </section>
         ) : (
           <>
+            {report?.truncated && <div className="inline-notice" role="status">This range holds {report.reading_count} readings. Totals and averages cover all of them; the chart and log below show only the newest {report.returned_count}. Choose a shorter date range to see everything.</div>}
             {reportReadings.length ? (
               <section className="panel content-panel report-chart-panel">
                 <div className="panel-heading">

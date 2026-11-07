@@ -33,10 +33,17 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserRead)
-def update_user(user_id: int, is_active: bool, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
+    if user.id == current_admin.id and not is_active:
+        raise HTTPException(status_code=400, detail="You cannot deactivate your own account.")
     user.is_active = is_active
     db.commit()
     db.refresh(user)

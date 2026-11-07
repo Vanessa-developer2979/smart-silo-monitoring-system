@@ -44,6 +44,20 @@ npm run dev -- --host localhost
 
 Vite serves the frontend at `http://localhost:5173`. `VITE_API_URL` defaults to `http://127.0.0.1:8000/api`.
 
+## ESP32 firmware
+
+Source is in `firmware/esp32_silo_monitor/`. Copy `secrets.example.h` to `secrets.h` (git-ignored) and fill in Wi-Fi, `API_BASE_URL` (including `/api`), `DEVICE_API_KEY` (= backend `ESP32_API_KEY`) and `SILO_ID`. Requires the Adafruit "DHT sensor library". The device posts `silo_id`, `temperature_c` and `humidity_percent` every 5 minutes. Set `API_ROOT_CA` in `secrets.h` to enable TLS certificate verification.
+
+Known gap: the water/level sensor on GPIO34 is read and printed on the serial monitor only, because the API has no field for it yet.
+
+## Tests
+
+```
+cd backend
+pip install pytest httpx
+pytest -q
+```
+
 ## Deployment
 
 The frontend is a Vite single-page app for Vercel; the FastAPI backend and PostgreSQL database are configured as a Render Blueprint in `render.yaml`.

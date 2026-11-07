@@ -2,7 +2,8 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api',
-  timeout: 8000,
+  // Render's free web service can take ~50 s to wake from sleep.
+  timeout: 60000,
 })
 
 api.interceptors.request.use((config) => {

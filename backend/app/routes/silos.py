@@ -9,19 +9,27 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 
-from app.models import Silo, User
+from app.models import SensorReading, Silo, User
 from app.schemas import AssignmentCreate, SiloCreate, SiloUpdate
+from app.services.readings import latest_reading
 
 router = APIRouter(tags=["silos and assignments"], dependencies=[Depends(get_current_user)])
 
 
-def silo_payload(silo: Silo, data_source: Literal["hardware", "manual"] | None = None) -> dict:
-    readings = [
-        reading for reading in silo.readings
-        if reading.data_source in ("hardware", "manual")
-        and (data_source is None or reading.data_source == data_source)
-    ]
-    latest = max(readings, key=lambda reading: reading.recorded_at, default=None)
+ONLINE_WINDOW_SECONDS = 15 * 60
+
+
+def silo_payload(
+    silo: Silo,
+    latest: SensorReading | None,
+    latest_hardware: SensorReading | None,
+) -> dict:
+    """Build the API view of a silo.
+
+    ``latest`` is the newest reading in the requested data mode. ``latest_hardware`` is the
+    newest ESP32 reading regardless of mode: connection state describes the device, so it
+    must not read "offline" just because the user is viewing manual readings.
+    """
     status_value = "normal"
     if latest and (
         latest.temperature_c >= silo.temperature_critical_c
@@ -33,15 +41,16 @@ def silo_payload(silo: Silo, data_source: Literal["hardware", "manual"] | None =
         or latest.humidity_percent >= silo.humidity_warning_percent
     ):
         status_value = "warning"
-    now = datetime.now(timezone.utc)
-    recorded_at = latest.recorded_at if latest else None
-    if recorded_at and recorded_at.tzinfo is None:
-        recorded_at = recorded_at.replace(tzinfo=timezone.utc)
-    is_fresh = recorded_at is not None and (now - recorded_at).total_seconds() <= 15 * 60
-    if latest and latest.data_source == "hardware" and is_fresh:
-        connection_status = "online"
-    else:
-        connection_status = "offline"
+
+    connection_status = "offline"
+    if latest_hardware is not None:
+        recorded_at = latest_hardware.recorded_at
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - recorded_at).total_seconds()
+        if age <= ONLINE_WINDOW_SECONDS:
+            connection_status = "online"
+
     return {
         "id": silo.id,
         "name": silo.name,
@@ -68,6 +77,16 @@ def silo_payload(silo: Silo, data_source: Literal["hardware", "manual"] | None =
     }
 
 
+def build_silo_payload(
+    db: Session,
+    silo: Silo,
+    data_source: Literal["hardware", "manual"] | None = None,
+) -> dict:
+    latest = latest_reading(db, silo.id, data_source)
+    latest_hardware = latest if data_source == "hardware" else latest_reading(db, silo.id, "hardware")
+    return silo_payload(silo, latest, latest_hardware)
+
+
 @router.get("/silos/")
 def list_silos(
     data_source: Literal["hardware", "manual"] | None = None,
@@ -78,7 +97,7 @@ def list_silos(
     if current_user.role != "administrator":
         assigned_ids = {silo.id for silo in current_user.assigned_silos}
         silos = [silo for silo in silos if silo.id in assigned_ids]
-    return [silo_payload(silo, data_source) for silo in silos]
+    return [build_silo_payload(db, silo, data_source) for silo in silos]
 
 
 @router.post("/silos/", status_code=status.HTTP_201_CREATED)
@@ -95,7 +114,7 @@ def create_silo(payload: SiloCreate, db: Session = Depends(get_db), _: User = De
         db.rollback()
         raise HTTPException(status_code=409, detail="A silo with this name already exists.") from exc
     db.refresh(silo)
-    return silo_payload(silo)
+    return build_silo_payload(db, silo)
 
 
 @router.get("/silos/{silo_id}")
@@ -105,7 +124,7 @@ def get_silo(silo_id: int, db: Session = Depends(get_db), current_user: User = D
         raise HTTPException(status_code=404, detail="Silo not found.")
     if current_user.role != "administrator" and silo not in current_user.assigned_silos:
         raise HTTPException(status_code=403, detail="This silo is not assigned to your account.")
-    return silo_payload(silo)
+    return build_silo_payload(db, silo)
 
 
 @router.patch("/silos/{silo_id}")
@@ -124,9 +143,13 @@ def update_silo(silo_id: int, payload: SiloUpdate, db: Session = Depends(get_db)
         raise HTTPException(status_code=422, detail="Critical humidity must be at least the warning threshold.")
     for key, value in updates.items():
         setattr(silo, key, value)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A silo with this name already exists.") from exc
     db.refresh(silo)
-    return silo_payload(silo)
+    return build_silo_payload(db, silo)
 
 
 @router.delete("/silos/{silo_id}", status_code=status.HTTP_204_NO_CONTENT)

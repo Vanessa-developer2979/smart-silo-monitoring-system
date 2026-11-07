@@ -37,7 +37,8 @@ def register(payload: UserRegistration, db: Session = Depends(get_db)):
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
-    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
+    password_ok = verify_password(payload.password, user.password_hash if user else None)
+    if user is None or not user.is_active or not password_ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email or password is incorrect.")
     return auth_response(user)
 

@@ -6,6 +6,9 @@ from pwdlib import PasswordHash
 from app.config import settings
 
 password_hash = PasswordHash.recommended()
+# Verified against when an account does not exist so login timing does not reveal
+# which email addresses are registered.
+_DUMMY_HASH = password_hash.hash("timing-equalisation-placeholder")
 
 
 def hash_password(password: str) -> str:
@@ -13,7 +16,10 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed_password: str | None) -> bool:
-    return bool(hashed_password) and password_hash.verify(password, hashed_password)
+    if not hashed_password:
+        password_hash.verify(password, _DUMMY_HASH)
+        return False
+    return password_hash.verify(password, hashed_password)
 
 
 def create_access_token(user_id: int, role: str) -> str:

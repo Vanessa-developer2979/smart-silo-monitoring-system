@@ -10,6 +10,7 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models import Alert, SensorReading, Silo, User
 from app.schemas import AlertCreate, AlertRead, HardwareReadingCreate, ReadingCreate, ReadingRead, ReadingValues
+from app.services.readings import VALID_DATA_SOURCES, latest_reading
 
 router = APIRouter(tags=["monitoring"], dependencies=[Depends(get_current_user)])
 hardware_router = APIRouter(tags=["monitoring"])
@@ -24,7 +25,7 @@ def list_readings(
     current_user: User = Depends(get_current_user),
 ):
     query = select(SensorReading).join(Silo).order_by(SensorReading.recorded_at.desc())
-    query = query.where(SensorReading.data_source.in_(("hardware", "manual")))
+    query = query.where(SensorReading.data_source.in_(VALID_DATA_SOURCES))
     if silo_id is not None:
         query = query.where(SensorReading.silo_id == silo_id)
     if current_user.role != "administrator":
@@ -40,17 +41,12 @@ def latest_readings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    silos = db.scalars(select(Silo).options(joinedload(Silo.readings))).unique().all()
+    query = select(Silo).order_by(Silo.id)
+    if current_user.role != "administrator":
+        query = query.where(Silo.operators.any(User.id == current_user.id))
     result = []
-    for silo in silos:
-        if current_user.role != "administrator" and silo not in current_user.assigned_silos:
-            continue
-        readings = [
-            item for item in silo.readings
-            if item.data_source in ("hardware", "manual")
-            and (data_source is None or item.data_source == data_source)
-        ]
-        reading = max(readings, key=lambda item: item.recorded_at, default=None)
+    for silo in db.scalars(query).all():
+        reading = latest_reading(db, silo.id, data_source)
         if reading:
             result.append(reading)
     return result

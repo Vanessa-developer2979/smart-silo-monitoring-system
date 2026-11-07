@@ -21,7 +21,9 @@ class Settings:
     initial_admin_name: str = os.getenv("INITIAL_ADMIN_NAME", "System Administrator")
     esp32_api_key: str = os.getenv("ESP32_API_KEY", "")
     cors_origins: list[str] = [
-        origin.strip()
+        # Browsers send Origin without a trailing slash; a pasted "https://app.vercel.app/"
+        # would otherwise never match and every request would fail CORS.
+        origin.strip().rstrip("/")
         for origin in os.getenv(
             "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
         ).split(",")

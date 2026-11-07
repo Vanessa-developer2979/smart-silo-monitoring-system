@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class ORMModel(BaseModel):
@@ -54,15 +54,15 @@ class SiloCreate(BaseModel):
 
 
 class SiloUpdate(BaseModel):
-    name: str = Field(default=None, min_length=1, max_length=120)
-    location: str = Field(default=None, min_length=1, max_length=200)
-    grain_type: str = Field(default=None, min_length=1, max_length=60)
-    capacity_tonnes: float = Field(default=None, gt=0)
-    capacity_percent: float = Field(default=None, ge=0, le=100)
-    temperature_warning_c: float = Field(default=None, ge=-20, le=80)
-    temperature_critical_c: float = Field(default=None, ge=-20, le=80)
-    humidity_warning_percent: float = Field(default=None, ge=0, le=100)
-    humidity_critical_percent: float = Field(default=None, ge=0, le=100)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    location: str | None = Field(default=None, min_length=1, max_length=200)
+    grain_type: str | None = Field(default=None, min_length=1, max_length=60)
+    capacity_tonnes: float | None = Field(default=None, gt=0)
+    capacity_percent: float | None = Field(default=None, ge=0, le=100)
+    temperature_warning_c: float | None = Field(default=None, ge=-20, le=80)
+    temperature_critical_c: float | None = Field(default=None, ge=-20, le=80)
+    humidity_warning_percent: float | None = Field(default=None, ge=0, le=100)
+    humidity_critical_percent: float | None = Field(default=None, ge=0, le=100)
     is_active: bool | None = None
 
 
@@ -72,6 +72,17 @@ class ReadingValues(BaseModel):
     humidity_percent: float = Field(ge=0, le=100)
     grain_moisture_percent: float | None = Field(default=None, ge=0, le=100)
     recorded_at: datetime | None = None
+
+    @field_validator("recorded_at")
+    @classmethod
+    def recorded_at_not_in_future(cls, value: datetime | None) -> datetime | None:
+        # A future-dated row would sort as the "latest" reading and hide every real one.
+        if value is None:
+            return value
+        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        if aware > datetime.now(timezone.utc) + timedelta(minutes=5):
+            raise ValueError("recorded_at cannot be in the future.")
+        return value
 
 
 class ReadingCreate(ReadingValues):

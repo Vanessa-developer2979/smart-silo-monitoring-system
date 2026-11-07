@@ -15,7 +15,11 @@ export function AuthProvider({ children }) {
     }
     api.get('/auth/me')
       .then(({ data }) => setUser(data))
-      .catch(() => sessionStorage.removeItem('accessToken'))
+      .catch((error) => {
+        // The response interceptor already clears the token on 401. Any other failure
+        // (network, cold start, 5xx) must not sign the user out.
+        if (error.response?.status === 401) sessionStorage.removeItem('accessToken')
+      })
       .finally(() => setLoading(false))
     return () => window.removeEventListener('auth:expired', handleExpiredSession)
   }, [])
