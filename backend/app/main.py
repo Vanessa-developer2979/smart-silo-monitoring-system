@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.routes import auth, inspections, monitoring, reports, silos, users
 from app.models import User
-from app.security import hash_password
+from app.security import hash_password, verify_password
 
 
 def migrate_additive_columns():
@@ -39,40 +39,30 @@ def migrate_additive_columns():
 
 
 def provision_initial_admin():
+    """Keep the bootstrap administrator in sync with INITIAL_ADMIN_EMAIL / INITIAL_ADMIN_PASSWORD.
+
+    The account is created if missing. If it exists but the stored password no longer matches
+    the configured one, the password is reset and the account is re-activated as administrator.
+    Previously this ran only once, so changing the variables later silently did nothing and
+    locked people out. When the password already matches, nothing is modified, so an admin
+    who was deliberately deactivated stays deactivated.
+    """
     if bool(settings.initial_admin_email) != bool(settings.initial_admin_password):
         raise RuntimeError("Set both INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD to provision an administrator.")
     if not settings.initial_admin_email:
         return
 
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                "CREATE TABLE IF NOT EXISTS app_migrations ("
-                "name VARCHAR(120) PRIMARY KEY, "
-                "applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
-            )
-        )
-
-    migration_name = "initial-admin-provisioned"
     with SessionLocal() as db:
-        if db.scalar(
-            text("SELECT 1 FROM app_migrations WHERE name = :name"),
-            {"name": migration_name},
-        ):
-            return
-
         admin = db.scalar(select(User).where(User.email == settings.initial_admin_email))
+        if admin is not None and verify_password(settings.initial_admin_password, admin.password_hash):
+            return
         if admin is None:
             admin = User(email=settings.initial_admin_email)
             db.add(admin)
-        admin.full_name = settings.initial_admin_name
+        admin.full_name = admin.full_name or settings.initial_admin_name
         admin.role = "administrator"
         admin.is_active = True
         admin.password_hash = hash_password(settings.initial_admin_password)
-        db.execute(
-            text("INSERT INTO app_migrations (name) VALUES (:name)"),
-            {"name": migration_name},
-        )
         db.commit()
 
 
