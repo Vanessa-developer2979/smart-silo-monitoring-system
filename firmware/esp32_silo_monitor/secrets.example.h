@@ -7,7 +7,7 @@
 
 // Base URL of the deployed API including /api, no trailing slash.
 // Example: "https://smart-silo-api.onrender.com/api"
-#define API_BASE_URL     "https://smart-silo-api-jwo0.onrender.com"
+#define API_BASE_URL     "https://smart-silo-api-jwo0.onrender.com/api"
 
 // Must equal ESP32_API_KEY configured on the backend.
 #define DEVICE_API_KEY   "FLax43okQ8bgkOCBh1rJINywfAj4DsXVb2xkN5_V1sxTW-I7jbd_ebGeNhmSCUOf"
