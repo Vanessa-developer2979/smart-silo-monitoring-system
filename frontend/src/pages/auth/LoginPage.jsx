@@ -68,8 +68,8 @@ export function LoginPage() {
       </section>
       <section className="login-card">
         <span className="eyebrow">MALAWI GRAIN MONITORING</span>
-        <h1>{createAccount ? 'Create Account' : 'Welcome'}</h1>
-        <p className="login-copy">{createAccount ? 'Create an operator account to access your silo dashboard.' : 'Log in to your Smart Silo'}</p>
+        {/*<---- <h1>{createAccount ? 'Create Account' : 'Welcome'}</h1>
+        <p className="login-copy">{createAccount ? 'Create an operator account to access your silo dashboard.' : 'Log in to your Smart Silo'}</p> ---- >*/}
 
         {message && <div className="login-message" role="alert">{message}</div>}
 
