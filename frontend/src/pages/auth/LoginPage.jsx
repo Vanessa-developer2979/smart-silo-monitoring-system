@@ -74,19 +74,6 @@ export function LoginPage() {
         {message && <div className="login-message" role="alert">{message}</div>}
 
         {createAccount ? (
-          <form className="login-form" onSubmit={submitRegistration}>
-            <label className="form-label" htmlFor="account-name">Full name</label>
-            <input id="account-name" autoComplete="name" required maxLength="150" value={account.full_name} onChange={(event) => setAccount({ ...account, full_name: event.target.value })} placeholder="Enter your full name" />
-            <label className="form-label" htmlFor="account-email">Email address</label>
-            <input id="account-email" type="email" autoComplete="email" required value={account.email} onChange={(event) => setAccount({ ...account, email: event.target.value })} placeholder="operator@smartsilo.mw" />
-            <label className="form-label" htmlFor="account-password">Password</label>
-            <div className="password-input-wrap">
-              <input id="account-password" type={showAccountPassword ? 'text' : 'password'} autoComplete="new-password" required minLength="8" maxLength="128" value={account.password} onChange={(event) => setAccount({ ...account, password: event.target.value })} placeholder="At least 8 characters" />
-              <button className="password-visibility-toggle" type="button" aria-label={showAccountPassword ? 'Hide password' : 'Show password'} aria-controls="account-password" aria-pressed={showAccountPassword} onClick={() => setShowAccountPassword((visible) => !visible)}>{showAccountPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-            </div>
-            <button className="button button-primary login-button" disabled={busy}>{busy ? 'Creating account…' : 'Create Account'} <UserPlus size={17} /></button>
-          </form>
-        ) : (
           <form className="login-form" onSubmit={submitLogin}>
             <label className="form-label" htmlFor="login-email">Email address</label>
             <input id="login-email" type="email" autoComplete="username" required value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} placeholder="operator@smartsilo.mw" />
