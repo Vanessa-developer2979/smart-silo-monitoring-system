@@ -51,11 +51,6 @@ export function LoginPage() {
     authenticate('/auth/login', credentials, 'Unable to log in. Check your details and try again.')
   }
 
-  const submitRegistration = (event) => {
-    event.preventDefault()
-    authenticate('/auth/register', account, 'Unable to create your account. Check your details and try again.')
-  }
-
   return (
     <main className="login-page">
       <div className="login-brand">
@@ -72,19 +67,6 @@ export function LoginPage() {
         <p className="login-copy">{createAccount ? 'Create an operator account to access your silo dashboard.' : 'Log in to your Smart Silo'}</p> ---- >*/}
 
         {message && <div className="login-message" role="alert">{message}</div>}
-
-        {createAccount ? (
-          <form className="login-form" onSubmit={submitLogin}>
-            <label className="form-label" htmlFor="login-email">Email address</label>
-            <input id="login-email" type="email" autoComplete="username" required value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} placeholder="operator@smartsilo.mw" />
-            <label className="form-label" htmlFor="login-password">Password</label>
-            <div className="password-input-wrap">
-              <input id="login-password" type={showLoginPassword ? 'text' : 'password'} autoComplete="current-password" required value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="Enter your password" />
-              <button className="password-visibility-toggle" type="button" aria-label={showLoginPassword ? 'Hide password' : 'Show password'} aria-controls="login-password" aria-pressed={showLoginPassword} onClick={() => setShowLoginPassword((visible) => !visible)}>{showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-            </div>
-            <button className="button button-primary login-button" disabled={busy}>{busy ? 'Signing in…' : 'Log In'} <ArrowRight size={17} /></button>
-          </form>
-        )}
 
         <div className="login-switch">
           <span>{createAccount ? 'Already have an account?' : 'New to the system?'}</span>
