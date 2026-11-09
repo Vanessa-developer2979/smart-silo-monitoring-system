@@ -19,7 +19,6 @@ export function useDashboardData() {
       ...silo,
       temperature: silo.latest_reading?.temperature_c,
       humidity: silo.latest_reading?.humidity_percent,
-      grain_moisture_percent: silo.latest_reading?.grain_moisture_percent,
       data_source: silo.latest_reading?.data_source,
     })))
     setAlerts(data.alerts)

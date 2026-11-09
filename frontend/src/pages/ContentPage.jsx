@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Plus, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
+import { Activity, ArrowDownToLine, Check, ChevronLeft, ChevronRight, Settings, Shield, Trash2, UserPlus, Warehouse } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DataModeSelector } from '../components/common/DataModeSelector.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
@@ -52,16 +52,12 @@ function buildReportCharts(readings, silos) {
     const timestamp = hour.getTime()
     let group = chart.hours.get(timestamp)
     if (!group) {
-      group = { timestamp, count: 0, temperature: 0, humidity: 0, moistureTotal: 0, moistureCount: 0 }
+      group = { timestamp, count: 0, temperature: 0, humidity: 0 }
       chart.hours.set(timestamp, group)
     }
     group.count += 1
     group.temperature += reading.temperature_c
     group.humidity += reading.humidity_percent
-    if (reading.grain_moisture_percent != null) {
-      group.moistureTotal += reading.grain_moisture_percent
-      group.moistureCount += 1
-    }
   }
 
   return Array.from(charts.values()).map((chart) => ({
@@ -71,7 +67,6 @@ function buildReportCharts(readings, silos) {
       time: new Date(group.timestamp).toLocaleString('en-MW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Blantyre' }),
       temperature: Number((group.temperature / group.count).toFixed(2)),
       humidity: Number((group.humidity / group.count).toFixed(2)),
-      moisture: group.moistureCount ? Number((group.moistureTotal / group.moistureCount).toFixed(2)) : null,
     })),
   }))
 }
@@ -94,13 +89,11 @@ export function ContentPage({ page }) {
   const [reportError, setReportError] = useState('')
   const [message, setMessage] = useState('')
   const [successToast, setSuccessToast] = useState('')
-  const [showForm, setShowForm] = useState(false)
   const [showUserForm, setShowUserForm] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ name: '', location: '', grain_type: 'Wheat', capacity_tonnes: 1000 })
   const [userForm, setUserForm] = useState({ full_name: '', email: '', role: 'operator', password: '' })
   const [inspectionForm, setInspectionForm] = useState({ silo_id: '', activity_type: 'inspection', notes: '' })
-  const [readingForm, setReadingForm] = useState({ silo_id: '', temperature_c: '', humidity_percent: '', grain_moisture_percent: '' })
+  const [readingForm, setReadingForm] = useState({ silo_id: '', temperature_c: '', humidity_percent: '' })
   const [apiReady, setApiReady] = useState(false)
   const [loadedDataSource, setLoadedDataSource] = useState(null)
 
@@ -166,20 +159,6 @@ export function ContentPage({ page }) {
     })
     return () => { active = false }
   }, [page, dataSource, reportPeriod])
-
-  const submitSilo = async (event) => {
-    event.preventDefault()
-    setBusy(true)
-    setMessage('')
-    try {
-      const created = await siloService.create({ ...form, capacity_tonnes: Number(form.capacity_tonnes) })
-      setSilos((items) => [created, ...items])
-      setShowForm(false)
-      setForm({ name: '', location: '', grain_type: 'Wheat', capacity_tonnes: 1000 })
-    } catch (error) {
-      setMessage(error.response?.data?.detail || 'Could not save silo. Check the API connection and form values.')
-    } finally { setBusy(false) }
-  }
 
   const acknowledge = async (alertId) => {
     try {
@@ -284,7 +263,6 @@ export function ContentPage({ page }) {
         silo_id: Number(readingForm.silo_id),
         temperature_c: Number(readingForm.temperature_c),
         humidity_percent: Number(readingForm.humidity_percent),
-        grain_moisture_percent: Number(readingForm.grain_moisture_percent),
         data_source: 'manual',
       })
     } catch (error) {
@@ -292,7 +270,7 @@ export function ContentPage({ page }) {
       return
     }
 
-    setReadingForm({ silo_id: '', temperature_c: '', humidity_percent: '', grain_moisture_percent: '' })
+    setReadingForm({ silo_id: '', temperature_c: '', humidity_percent: '' })
     setHistory((items) => [saved, ...items.filter((item) => item.id !== saved.id)])
     setSuccessToast('Reading saved successfully.')
     try {
@@ -328,7 +306,7 @@ export function ContentPage({ page }) {
   const reportCharts = buildReportCharts(reportReadings, [])
 
   const exportReportCsv = () => {
-    const headers = ['Date', 'Time', 'Silo', 'Temperature (°C)', 'Air Humidity (%)', 'Grain Moisture (%)', 'Data Source', 'Status']
+    const headers = ['Date', 'Time', 'Silo', 'Temperature (°C)', 'Air Humidity (%)', 'Data Source', 'Status']
     const safeCell = (value) => {
       const text = String(value ?? '')
       const safe = typeof value !== 'number' && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
@@ -344,7 +322,6 @@ export function ContentPage({ page }) {
           reading.silo_name,
           reading.temperature_c,
           reading.humidity_percent,
-          reading.grain_moisture_percent ?? '',
           sourceNames[reading.data_source] || reading.data_source,
           reading.status,
         ]
@@ -366,7 +343,6 @@ export function ContentPage({ page }) {
       <div className="content-title-row">
         <div><div className="eyebrow">{tab.toUpperCase()}</div><h1>{title}</h1><p>{description}</p></div>
         <div className={`content-actions${page === 'reports' ? ' report-controls' : ''}`}>
-          {page === 'silos' && isAdministrator && <button className="button button-primary" onClick={() => setShowForm((value) => !value)}><Plus size={17} /> Register silo</button>}
           {page === 'users' && <button className="button button-primary" onClick={() => setShowUserForm((value) => !value)}><UserPlus size={16} /> Add user record</button>}
           {page === 'reports' && <>
             <label className="report-control">Date range
@@ -384,28 +360,21 @@ export function ContentPage({ page }) {
       {successToast && <div className="toast-notice" role="status">{successToast}</div>}
       {message && <div className="inline-notice" role="status">{message}</div>}
 
-      {page === 'monitoring' && dataSource === 'manual' && <section className="panel content-panel manual-entry-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Enter the values you measured. Saved readings are labeled Manual, not sensor data. You can delete an incorrect entry from the reading log.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><label>Grain moisture (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.grain_moisture_percent} onChange={(event) => setReadingForm({ ...readingForm, grain_moisture_percent: event.target.value })} /></label><button className="button button-primary" disabled={!pageSilos.length}>Save manual reading</button></form>{!pageSilos.length && apiReady && <p className="page-footnote">No silos are assigned to your account. Ask an administrator to assign a silo before entering a reading.</p>}</section>}
+      {page === 'monitoring' && dataSource === 'manual' && <section className="panel content-panel manual-entry-panel"><div className="panel-heading"><div><h2>Enter a manual reading</h2><p>Enter the values you measured. Saved readings are labeled Manual, not sensor data. You can delete an incorrect entry from the reading log.</p></div></div><form className="silo-form reading-form" onSubmit={submitReading}><label>Silo<select required value={readingForm.silo_id} onChange={(event) => setReadingForm({ ...readingForm, silo_id: event.target.value })}><option value="">Select silo</option>{pageSilos.map((silo) => <option key={silo.id} value={silo.id}>{silo.name}</option>)}</select></label><label>Air temperature (°C)<input type="number" step="0.1" required value={readingForm.temperature_c} onChange={(event) => setReadingForm({ ...readingForm, temperature_c: event.target.value })} /></label><label>Air humidity (%)<input type="number" step="0.1" min="0" max="100" required value={readingForm.humidity_percent} onChange={(event) => setReadingForm({ ...readingForm, humidity_percent: event.target.value })} /></label><button className="button button-primary" disabled={!pageSilos.length}>Save manual reading</button></form>{!pageSilos.length && apiReady && <p className="page-footnote">No silos are assigned to your account. Ask an administrator to assign a silo before entering a reading.</p>}</section>}
       {page === 'silos' && (
         <section className="panel silo-panel content-panel">
           <div className="panel-heading"><div><h2>Local Silo</h2><p>Storage details and current readings for your local site.</p></div></div>
-          {showForm && isAdministrator && <form className="silo-form" onSubmit={submitSilo}>
-            <label>Silo name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. Lilongwe Silo 03" /></label>
-            <label>Location<input required value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} placeholder="District or region" /></label>
-            <label>Grain type<select value={form.grain_type} onChange={(event) => setForm({ ...form, grain_type: event.target.value })}><option>Wheat</option><option>Barley</option><option>Maize</option><option>Oats</option><option>Soybean</option></select></label>
-            <label>Capacity (tonnes)<input type="number" min="1" required value={form.capacity_tonnes} onChange={(event) => setForm({ ...form, capacity_tonnes: event.target.value })} /></label>
-            <button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save silo'}</button>
-          </form>}
           <SiloTable silos={pageSilos} />
         </section>
       )}
 
       {page === 'monitoring' && <>
-        <div className="metric-grid compact-metrics">{[['Temperature', averageOf('temperature_c'), 'Air temperature'], ['Air humidity', averageOf('humidity_percent'), 'Relative humidity'], ['Grain moisture', averageOf('grain_moisture_percent'), 'Moisture content']].map(([label, value, note]) => <article className="metric-card" key={label}><div className="metric-top">{label}<span className="metric-icon green"><Activity size={18} /></span></div><div className="metric-value">{value}</div><DataSourceBadge source={dataSource} /><div className="metric-bottom">{note}</div></article>)}</div>
+        <div className="metric-grid compact-metrics">{[['Temperature', averageOf('temperature_c'), 'Air temperature'], ['Air humidity', averageOf('humidity_percent'), 'Relative humidity']].map(([label, value, note]) => <article className="metric-card" key={label}><div className="metric-top">{label}<span className="metric-icon green"><Activity size={18} /></span></div><div className="metric-value">{value}</div><DataSourceBadge source={dataSource} /><div className="metric-bottom">{note}</div></article>)}</div>
         <section className="panel content-panel">
           <div className="panel-heading"><div><h2>Active silo readings</h2><p>Latest {sourceNames[dataSource]?.toLowerCase() || 'selected-mode'} readings for each silo you can access.</p></div></div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>SILO</th><th>LAST UPDATED</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th><th>STATUS</th></tr></thead>
+              <thead><tr><th>SILO</th><th>LAST UPDATED</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>SOURCE</th><th>STATUS</th></tr></thead>
               <tbody>
                 {pageSilos.filter((silo) => silo.latest_reading).map((silo) => (
                   <tr key={silo.id}>
@@ -413,13 +382,12 @@ export function ContentPage({ page }) {
                     <td>{silo.latest_reading ? formatAlertDate(silo.latest_reading.recorded_at) : '—'}</td>
                     <td>{silo.latest_reading ? `${silo.latest_reading.temperature_c}°C` : '—'}</td>
                     <td>{silo.latest_reading ? `${silo.latest_reading.humidity_percent}%` : '—'}</td>
-                    <td>{silo.latest_reading?.grain_moisture_percent == null ? '—' : `${silo.latest_reading.grain_moisture_percent}%`}</td>
                     <td>{silo.latest_reading && <span className={`source-badge ${silo.latest_reading.data_source}`}>{sourceNames[silo.latest_reading.data_source] || silo.latest_reading.data_source}</span>}</td>
                     <td><StatusBadge status={silo.status || 'offline'} /></td>
                   </tr>
                 ))}
-                {!pageSilos.length && <tr><td className="empty-table" colSpan="7">{loadedDataSource !== dataSource ? 'Loading readings…' : apiReady ? 'No silo is assigned to your account.' : 'Readings are unavailable right now.'}</td></tr>}
-                {pageSilos.length > 0 && !pageSilos.some((silo) => silo.latest_reading) && <tr><td className="empty-table" colSpan="7">No readings are available for this mode yet.</td></tr>}
+                {!pageSilos.length && <tr><td className="empty-table" colSpan="6">{loadedDataSource !== dataSource ? 'Loading readings…' : apiReady ? 'No silo is assigned to your account.' : 'Readings are unavailable right now.'}</td></tr>}
+                {pageSilos.length > 0 && !pageSilos.some((silo) => silo.latest_reading) && <tr><td className="empty-table" colSpan="6">No readings are available for this mode yet.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -428,7 +396,7 @@ export function ContentPage({ page }) {
           <div className="panel-heading"><div><h2>Recent reading log</h2><p>Saved {dataSource === 'manual' ? 'manual' : 'hardware'} entries for the selected mode.</p></div><span className="status-badge info">{visibleHistory.length} records</span></div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>SOURCE</th>{dataSource === 'manual' && <th><span className="visually-hidden">Actions</span></th>}</tr></thead>
+              <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>SOURCE</th>{dataSource === 'manual' && <th><span className="visually-hidden">Actions</span></th>}</tr></thead>
               <tbody>
                 {visibleHistory.slice(0, 10).map((reading) => (
                   <tr key={reading.id}>
@@ -437,7 +405,6 @@ export function ContentPage({ page }) {
                     <td>{pageSilos.find((silo) => silo.id === reading.silo_id)?.name || 'Local Silo'}</td>
                     <td>{reading.temperature_c}°C</td>
                     <td>{reading.humidity_percent}%</td>
-                    <td>{reading.grain_moisture_percent == null ? '—' : `${reading.grain_moisture_percent}%`}</td>
                     <td><span className={`source-badge ${reading.data_source}`}>{sourceNames[reading.data_source] || reading.data_source}</span></td>
                     {dataSource === 'manual' && <td><button type="button" className="icon-button inspection-delete-button" aria-label={`Delete manual reading for ${pageSilos.find((silo) => silo.id === reading.silo_id)?.name || `Silo ${reading.silo_id}`}`} title="Delete manual reading" onClick={() => deleteReading(reading)}><Trash2 size={16} /></button></td>}
                   </tr>
@@ -520,7 +487,6 @@ export function ContentPage({ page }) {
             ['Silos', report?.silo_count ?? 0],
             ['Avg. temperature', report?.average_temperature_c != null ? `${report.average_temperature_c}°C` : '—'],
             ['Avg. humidity', report?.average_humidity_percent != null ? `${report.average_humidity_percent}%` : '—'],
-            ['Avg. grain moisture', report?.average_grain_moisture_percent != null ? `${report.average_grain_moisture_percent}%` : '—'],
           ].map(([label, value]) => <article className="metric-card" key={label}><div className="metric-top">{label}</div><div className="metric-value">{value}</div><div className="metric-bottom">{report?.reading_count ?? 0} readings in selected range</div></article>)}
         </div>
         {reportLoading ? (
@@ -546,7 +512,6 @@ export function ContentPage({ page }) {
                       <div className="report-legend">
                         <span><i className="report-legend-temp" /> Temperature (°C)</span>
                         <span><i className="report-legend-humidity" /> Air humidity (%)</span>
-                        <span><i className="report-legend-moisture" /> Grain moisture (%)</span>
                       </div>
                       <div className="large-chart report-chart">
                         <ResponsiveContainer width="100%" height="100%">
@@ -558,7 +523,6 @@ export function ContentPage({ page }) {
                             <Tooltip />
                             <Line yAxisId="temperature" type="monotone" dataKey="temperature" name={`${chart.name} temperature (°C)`} stroke="#28814d" strokeWidth={2.2} dot={false} isAnimationActive={false} />
                             <Line yAxisId="percent" type="monotone" dataKey="humidity" name={`${chart.name} air humidity (%)`} stroke="#76a4ce" strokeWidth={2} dot={false} isAnimationActive={false} />
-                            <Line yAxisId="percent" type="monotone" dataKey="moisture" name={`${chart.name} grain moisture (%)`} stroke="#c58b3b" strokeWidth={2} dot={false} isAnimationActive={false} />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -577,7 +541,7 @@ export function ContentPage({ page }) {
               <div className="panel-heading"><div><h2>Historical reading log</h2><p>Saved {sourceNames[dataSource]?.toLowerCase() || dataSource} readings in the selected date range</p></div><span className="status-badge info">{readingLog.length} records</span></div>
               <div className="table-scroll">
                 <table>
-                  <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>DATA SOURCE</th><th>STATUS</th></tr></thead>
+                  <thead><tr><th>DATE</th><th>TIME</th><th>SILO</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>DATA SOURCE</th><th>STATUS</th></tr></thead>
                   <tbody>{visibleReportReadings.map((reading) => {
                     const recordedAt = new Date(reading.recorded_at)
                     return <tr key={reading.id}>
@@ -586,11 +550,10 @@ export function ContentPage({ page }) {
                       <td>{reading.silo_name}</td>
                       <td>{reading.temperature_c}°C</td>
                       <td>{reading.humidity_percent}%</td>
-                      <td>{reading.grain_moisture_percent == null ? '—' : `${reading.grain_moisture_percent}%`}</td>
                       <td><span className={`source-badge ${reading.data_source}`}>{sourceNames[reading.data_source] || reading.data_source}</span></td>
                       <td><StatusBadge status={reading.status} /></td>
                     </tr>
-                  })}{!readingLog.length && <tr><td className="empty-table" colSpan="8">No readings have been recorded in this date range.</td></tr>}</tbody>
+                  })}{!readingLog.length && <tr><td className="empty-table" colSpan="7">No readings have been recorded in this date range.</td></tr>}</tbody>
                 </table>
               </div>
               <div className="report-pagination">
@@ -616,5 +579,5 @@ export function ContentPage({ page }) {
 }
 
 function SiloTable({ silos }) {
-  return <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>HUMIDITY</th><th>GRAIN MOISTURE</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>{silos.map((silo) => <tr key={silo.id}><td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td><td>{silo.grain_type}</td><td><TemperatureReading value={silo.latest_reading?.temperature_c} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /></td><td>{silo.latest_reading ? `${silo.latest_reading.humidity_percent}%` : '—'}</td><td>{silo.latest_reading?.grain_moisture_percent != null ? <span className="moisture-cell">{silo.latest_reading.grain_moisture_percent}% <span className={`source-badge ${silo.latest_reading.data_source}`}>{sourceNames[silo.latest_reading.data_source]}</span></span> : '—'}</td><td><span className={(silo.capacity_percent || 0) > 90 ? 'capacity-high' : ''}>{silo.capacity_tonnes?.toLocaleString()} t · {silo.capacity_percent || 0}%</span></td><td><StatusBadge status={silo.connection_status || 'offline'} /></td></tr>)}</tbody></table>{silos.length === 0 && <div className="empty-state">Local Silo is not available yet.</div>}</div>
+  return <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>HUMIDITY</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>{silos.map((silo) => <tr key={silo.id}><td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td><td>{silo.grain_type}</td><td><TemperatureReading value={silo.latest_reading?.temperature_c} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /></td><td>{silo.latest_reading ? `${silo.latest_reading.humidity_percent}%` : '—'}</td><td><span className={(silo.capacity_percent || 0) > 90 ? 'capacity-high' : ''}>{silo.capacity_tonnes?.toLocaleString()} t · {silo.capacity_percent || 0}%</span></td><td><StatusBadge status={silo.connection_status || 'offline'} /></td></tr>)}</tbody></table>{silos.length === 0 && <div className="empty-state">Local Silo is not available yet.</div>}</div>
 }

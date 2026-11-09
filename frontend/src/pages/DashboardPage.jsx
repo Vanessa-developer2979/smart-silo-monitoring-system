@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, ArrowRight, CircleAlert, Droplets, Plus, Thermometer, Warehouse } from 'lucide-react'
+import { ArrowRight, CircleAlert, Droplets, Thermometer, Warehouse } from 'lucide-react'
 import { StatusBadge } from '../components/dashboard/StatusBadge.jsx'
 import { TemperatureReading } from '../components/dashboard/TemperatureReading.jsx'
 import { DataSourceBadge } from '../components/dashboard/DataSourceBadge.jsx'
@@ -11,11 +11,6 @@ import { useAuth } from '../hooks/useAuth.js'
 const numberAverage = (items) => items.length
   ? items.reduce((total, value) => total + value, 0) / items.length
   : null
-
-const sourceLabel = (source) => ({
-  hardware: 'Hardware',
-  manual: 'Manual',
-}[source] || 'Unknown')
 
 export function DashboardPage({ operatorMode = false }) {
   const { silos, alerts, loading, loadError, actionError, acknowledge, resolve, dataSource } = useDashboardData()
@@ -34,7 +29,6 @@ export function DashboardPage({ operatorMode = false }) {
   ].filter(Boolean).join(' / ') || '0 Critical'
   const averageTemperature = numberAverage(visibleSilos.map((silo) => silo.temperature).filter(Number.isFinite))
   const averageHumidity = numberAverage(visibleSilos.map((silo) => silo.humidity).filter(Number.isFinite))
-  const averageMoisture = numberAverage(visibleSilos.map((silo) => silo.grain_moisture_percent).filter(Number.isFinite))
   const [now, setNow] = useState(() => new Date())
   const [actionToast, setActionToast] = useState('')
   useEffect(() => {
@@ -66,7 +60,6 @@ export function DashboardPage({ operatorMode = false }) {
         </div>
         <div className="welcome-actions">
           {user?.role === 'administrator' && <Link className="button button-secondary" to="/reports">View reports</Link>}
-          {!operatorMode && <Link className="button button-primary" to="/silos"><Plus size={17} /> Add silo</Link>}
         </div>
       </div>
       <DataModeSelector />
@@ -78,7 +71,6 @@ export function DashboardPage({ operatorMode = false }) {
       <section className="metric-grid">
         <MetricCard label="Avg. temperature" value={averageTemperature == null ? '—' : `${averageTemperature.toFixed(1)}°C`} note="Air temperature" icon={Thermometer} style="blue" dataSource={dataSource} />
         <MetricCard label="Avg. air humidity" value={averageHumidity == null ? '—' : `${Math.round(averageHumidity)}%`} note="Relative humidity" icon={Droplets} style="purple" dataSource={dataSource} />
-        <MetricCard label="Avg. grain moisture" value={averageMoisture == null ? '—' : `${averageMoisture.toFixed(1)}%`} note="Grain moisture content" icon={Activity} style="green" dataSource={dataSource} />
         <MetricCard label="Active alerts" value={activeAlertSummary} note={`${activeThresholdCount} unresolved alerts`} icon={CircleAlert} style="orange" alertValue />
       </section>
 
@@ -105,21 +97,19 @@ export function DashboardPage({ operatorMode = false }) {
 
       <section className="panel silo-panel">
         <div className="panel-heading"><div><h2>Local silo health</h2><p>Latest readings, fill level, and connection state</p></div><Link className="text-link" to="/silos">Local silo details <ArrowRight size={14} /></Link></div>
-        <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>GRAIN MOISTURE</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>
+        <div className="table-scroll"><table><thead><tr><th>SILO</th><th>GRAIN TYPE</th><th>TEMPERATURE</th><th>AIR HUMIDITY</th><th>CAPACITY</th><th>CONNECTION</th></tr></thead><tbody>
           {visibleSilos.map((silo) => {
-            const moisture = silo.grain_moisture_percent
             const fill = silo.capacity_percent ?? 0
             return <tr key={silo.id}>
               <td><div className="silo-name"><span className="silo-icon"><Warehouse size={16} /></span><span><strong>{silo.name}</strong><small>{silo.location}</small></span></div></td>
               <td>{silo.grain_type}</td>
               <td>{Number.isFinite(silo.temperature) ? <TemperatureReading value={silo.temperature} warningThreshold={silo.temperature_warning_c} criticalThreshold={silo.temperature_critical_c} /> : 'No readings available'}</td>
               <td>{Number.isFinite(silo.humidity) ? `${silo.humidity}%` : '—'}</td>
-              <td><div className="moisture-cell"><span>{Number.isFinite(moisture) ? `${moisture}%` : '—'}</span>{silo.data_source && <span className={`source-badge ${silo.data_source}`}>{sourceLabel(silo.data_source)}</span>}</div></td>
               <td><div className={`capacity-cell${fill > 90 ? ' capacity-high' : ''}`}><div className="capacity-track"><i style={{ width: `${fill}%` }} /></div><small>{fill}%</small></div></td>
               <td><StatusBadge status={silo.connection_status || 'offline'} /></td>
             </tr>
           })}
-          {!visibleSilos.length && <tr><td colSpan="7" className="empty-table">{loading ? 'Loading…' : loadError ? 'Data unavailable' : 'No readings available'}</td></tr>}
+          {!visibleSilos.length && <tr><td colSpan="6" className="empty-table">{loading ? 'Loading…' : loadError ? 'Data unavailable' : 'No readings available'}</td></tr>}
         </tbody></table></div>
       </section>
     </>
