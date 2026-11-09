@@ -11,10 +11,6 @@ const navigation = [
   { label: 'Alerts', path: '/alerts', icon: Bell },
   { label: 'Reports', path: '/reports', icon: ChartNoAxesCombined },
 ]
-const adminNavigation = [
-  { label: 'User management', path: '/users', icon: Users },
-  { label: 'Settings', path: '/settings', icon: Settings },
-]
 
 export function AppLayout() {
   const [open, setOpen] = useState(false)
@@ -104,7 +100,6 @@ export function AppLayout() {
         <div className="brand"><img className="brand-icon-image" src="/smart-silo-mark.svg" alt="" /><div><strong>Smart Silo Monitoring System</strong><small>MALAWI GRAIN MONITORING</small></div><button className="icon-button sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu"><X size={19} /></button></div>
         <div className="nav-section">MONITORING</div>
         <nav aria-label="Monitoring navigation">{links(navigation.map((item) => item.path === '/alerts' ? { ...item, count: activeAlertCount } : item))}</nav>
-        {user?.role === 'administrator' && <><div className="nav-section admin-section">ADMINISTRATION</div><nav aria-label="Administration navigation">{links(adminNavigation)}</nav></>}
         <div className="sidebar-footer"><span><Sprout size={17} /></span><div><strong>Grain storage operations</strong><small>Malawi monitoring workspace</small></div></div>
       </aside>
       <main className="main-area">
